@@ -1,0 +1,16 @@
+node_modules
+dist
+.vscode
+.idea
+.DS_Store
+__pycache__
+*.pyc
+*.log
+.venv
+logs/
+src-tauri/logs/
+.pytest_cache/
+
+src-tauri/target
+src-tauri/.cargo
+src-tauri/gen
