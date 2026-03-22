@@ -10,6 +10,7 @@ __pycache__
 logs/
 src-tauri/logs/
 .pytest_cache/
+docs/
 
 src-tauri/target
 src-tauri/.cargo
