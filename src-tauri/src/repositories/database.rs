@@ -479,31 +479,6 @@ impl Db {
     Ok(items)
   }
 
-  pub fn list_recording_account_logs(&self, limit: u32) -> Result<Vec<RecordingAccountLogEntry>, AppError> {
-    let conn = self.open()?;
-    let mut stmt = conn.prepare(
-      "SELECT account_id, level, message, ts
-       FROM recording_account_logs
-       ORDER BY ts DESC
-       LIMIT ?1",
-    )?;
-
-    let rows = stmt.query_map(params![limit], |row| {
-      Ok(RecordingAccountLogEntry {
-        account_id: row.get(0)?,
-        level: row.get(1)?,
-        message: row.get(2)?,
-        ts: row.get(3)?,
-      })
-    })?;
-
-    let mut items = Vec::new();
-    for row in rows {
-      items.push(row?);
-    }
-    Ok(items)
-  }
-
   pub fn list_recording_logs_for_account(
     &self,
     account_id: &str,
@@ -781,6 +756,38 @@ impl Db {
     }
 
     Ok(items)
+  }
+
+  pub fn clear_recording_runs(&self) -> Result<(), AppError> {
+    let mut conn = self.open()?;
+    let tx = conn.transaction()?;
+    let now = Utc::now().to_rfc3339();
+
+    tx.execute(
+      "DELETE FROM task_logs
+       WHERE task_id IN (
+         SELECT id
+         FROM tasks
+         WHERE task_type = 'recording.live'
+       )",
+      [],
+    )?;
+    tx.execute("DELETE FROM tasks WHERE task_type = 'recording.live'", [])?;
+    tx.execute(
+      "UPDATE recording_accounts
+       SET status = CASE
+             WHEN status = 'recording' AND enabled = 1 THEN 'watching'
+             WHEN status = 'recording' AND enabled = 0 THEN 'idle'
+             ELSE status
+           END,
+           last_recorded_at = NULL,
+           updated_at = ?1
+       WHERE last_recorded_at IS NOT NULL OR status = 'recording'",
+      params![now],
+    )?;
+
+    tx.commit()?;
+    Ok(())
   }
 
   pub fn list_active_recording_runs(&self) -> Result<Vec<RecordingRunItem>, AppError> {

@@ -57,6 +57,8 @@ const zhCN = {
       edit: '编辑',
       viewLogs: '查看日志',
       viewDetail: '查看明细',
+      clearRuns: '清空录制任务',
+      clearingRuns: '清空中...',
       runActiveHint: '录制进行中，任务明细中可查看完整日志。',
       runPendingHint: '任务已结束，可打开明细查看输出结果。',
       autoStart: '开播自动录制',

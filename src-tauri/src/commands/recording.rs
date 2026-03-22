@@ -163,15 +163,14 @@ pub fn resolve_recording_account_profile(
 
 #[tauri::command]
 pub fn recording_accounts_snapshot(
-  log_limit: Option<u32>,
+  _log_limit: Option<u32>,
   run_limit: Option<u32>,
   state: State<'_, AppState>,
 ) -> Result<RecordingAccountsSnapshot, AppError> {
-  let safe_limit = log_limit.unwrap_or(50).clamp(1, 200);
   let safe_run_limit = run_limit.unwrap_or(12).clamp(1, 100);
   Ok(RecordingAccountsSnapshot {
     accounts: state.db.list_recording_accounts()?,
-    logs: state.db.list_recording_account_logs(safe_limit)?,
+    logs: Vec::new(),
     runs: state.db.list_recording_runs(safe_run_limit)?,
   })
 }
@@ -291,6 +290,19 @@ pub fn recording_account_logs(
 
   let safe_limit = limit.unwrap_or(100).clamp(1, 500);
   state.db.list_recording_logs_for_account(trimmed, safe_limit)
+}
+
+#[tauri::command]
+pub fn clear_recording_runs(state: State<'_, AppState>) -> Result<RecordingAccountsSnapshot, AppError> {
+  let active_runs = state.db.list_active_recording_runs()?;
+  for item in active_runs {
+    state
+      .recording_scheduler
+      .stop_account(&item.account_id, "录制任务已清空。")?;
+  }
+
+  state.db.clear_recording_runs()?;
+  recording_accounts_snapshot(None, Some(12), state)
 }
 
 #[tauri::command]

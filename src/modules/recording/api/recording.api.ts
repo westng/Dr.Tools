@@ -53,6 +53,10 @@ export async function checkRecordingAccounts(accountIds?: string[]): Promise<Rec
   return invoke<RecordingSnapshot>('recording_accounts_check', { accountIds });
 }
 
+export async function clearRecordingRuns(): Promise<RecordingSnapshot> {
+  return invoke<RecordingSnapshot>('clear_recording_runs');
+}
+
 export async function getRecordingAccountLogs(accountId: string, limit = 100): Promise<Array<Omit<RecordingLogEntry, 'id'>>> {
   return invoke<Array<Omit<RecordingLogEntry, 'id'>>>('recording_account_logs', { accountId, limit });
 }

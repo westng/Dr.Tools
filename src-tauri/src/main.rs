@@ -11,13 +11,13 @@ use std::panic;
 use std::path::PathBuf;
 
 use commands::{
-  download_batch_detail, download_batch_list, download_batch_retry, frontend_log_error,
-  open_download_batch_detail_window, open_recording_account_create_window, open_recording_account_edit_window,
-  open_recording_account_logs_window, open_task_detail_window, python_ping, recording_account_create,
-  recording_account_delete, recording_account_detail, recording_account_logs, recording_account_set_enabled,
-  recording_account_update, recording_accounts_check, recording_accounts_snapshot, resolve_recording_account_profile,
-  select_export_directory, settings_check_update, settings_get, settings_update, system_info, task_batch_details,
-  task_detail, task_list, task_run, token_validate, video_download_submit,
+  clear_recording_runs, download_batch_detail, download_batch_list, download_batch_retry, frontend_log_error,
+  open_download_batch_detail_window, open_recording_account_create_window,
+  open_recording_account_edit_window, open_recording_account_logs_window, open_task_detail_window, python_ping,
+  recording_account_create, recording_account_delete, recording_account_detail, recording_account_logs,
+  recording_account_set_enabled, recording_account_update, recording_accounts_check, recording_accounts_snapshot,
+  resolve_recording_account_profile, select_export_directory, settings_check_update, settings_get, settings_update,
+  system_info, task_batch_details, task_detail, task_list, task_run, token_validate, video_download_submit,
 };
 use tauri::Manager;
 use crate::services::runtime_log::append_runtime_log;
@@ -57,6 +57,7 @@ fn main() {
       open_recording_account_edit_window,
       open_recording_account_logs_window,
       recording_accounts_snapshot,
+      clear_recording_runs,
       recording_account_create,
       recording_account_detail,
       recording_account_update,

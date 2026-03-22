@@ -57,6 +57,8 @@ const enUS = {
       edit: 'Edit',
       viewLogs: 'View Logs',
       viewDetail: 'View Detail',
+      clearRuns: 'Clear Recording Runs',
+      clearingRuns: 'Clearing...',
       runActiveHint: 'Recording is in progress. Open task detail for the full log.',
       runPendingHint: 'The task has finished. Open detail to inspect the result.',
       autoStart: 'Auto record when live',

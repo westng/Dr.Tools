@@ -5,6 +5,7 @@ import { listen } from '@tauri-apps/api/event';
 import { translate, useMessages } from '@/i18n';
 import { toErrorMessage } from '@/lib/errors';
 import {
+  clearRecordingRuns,
   checkRecordingAccounts,
   createRecordingAccount,
   deleteRecordingAccount as deleteRecordingAccountRequest,
@@ -27,6 +28,7 @@ const openError = ref('');
 const accounts = ref<RecordingAccount[]>([]);
 const recordingRuns = ref<RecordingRunItem[]>([]);
 const pendingToggleAccountIds = ref<string[]>([]);
+const clearingRuns = ref(false);
 
 const displayedRuns = computed(() => [...recordingRuns.value].sort((left, right) => right.updatedAt.localeCompare(left.updatedAt)));
 const enabledAccountCount = computed(() => accounts.value.filter((account) => account.enabled).length);
@@ -41,6 +43,19 @@ function applySnapshot(snapshot: RecordingSnapshot): void {
 async function loadSnapshot(): Promise<void> {
   const snapshot = await getRecordingSnapshot();
   applySnapshot(snapshot);
+}
+
+async function refreshAccountChecks(): Promise<void> {
+  if (!accounts.value.some((account) => account.enabled)) {
+    return;
+  }
+
+  try {
+    const snapshot = await checkRecordingAccounts();
+    applySnapshot(snapshot);
+  } catch (error) {
+    openError.value = toErrorMessage(error);
+  }
 }
 
 async function handleCreatedAccount(payload: RecordingAccountDraft): Promise<void> {
@@ -111,6 +126,23 @@ async function openLogsWindow(account: RecordingAccount): Promise<void> {
     await openRecordingAccountLogsWindow(account.id, translate(settings.value.locale, 'routes.recordingAccountLogs'));
   } catch (error) {
     openError.value = toErrorMessage(error);
+  }
+}
+
+async function clearRuns(): Promise<void> {
+  if (clearingRuns.value) {
+    return;
+  }
+
+  openError.value = '';
+  clearingRuns.value = true;
+  try {
+    const snapshot = await clearRecordingRuns();
+    applySnapshot(snapshot);
+  } catch (error) {
+    openError.value = toErrorMessage(error);
+  } finally {
+    clearingRuns.value = false;
   }
 }
 
@@ -275,10 +307,7 @@ async function openRunDetail(runId: string): Promise<void> {
 onMounted(async () => {
   try {
     await loadSnapshot();
-    if (accounts.value.some((account) => account.enabled)) {
-      const snapshot = await checkRecordingAccounts();
-      applySnapshot(snapshot);
-    }
+    void refreshAccountChecks();
   } catch (error) {
     openError.value = toErrorMessage(error);
   }
@@ -422,7 +451,12 @@ onUnmounted(() => {
           <div class="card-head-copy">
             <h3 class="panel-title">{{ text.runsTitle }}</h3>
           </div>
-          <span class="recording-chip">{{ displayedRuns.length }}</span>
+          <div class="recording-card-actions">
+            <span class="recording-chip">{{ displayedRuns.length }}</span>
+            <button class="recording-action-btn danger" type="button" :disabled="clearingRuns || displayedRuns.length === 0" @click="clearRuns">
+              {{ clearingRuns ? text.clearingRuns : text.clearRuns }}
+            </button>
+          </div>
         </div>
 
         <div v-if="displayedRuns.length === 0" class="recording-empty">
@@ -549,6 +583,12 @@ onUnmounted(() => {
   color: var(--text-muted);
   font-size: 12px;
   font-weight: 600;
+}
+
+.recording-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .recording-empty {

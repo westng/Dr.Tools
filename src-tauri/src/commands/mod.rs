@@ -5,10 +5,10 @@ mod tasks;
 mod windowing;
 
 pub use recording::{
-  open_recording_account_create_window, open_recording_account_edit_window, open_recording_account_logs_window,
-  recording_account_create, recording_account_delete, recording_account_detail, recording_account_logs,
-  recording_account_set_enabled, recording_account_update, recording_accounts_check, recording_accounts_snapshot,
-  resolve_recording_account_profile,
+  clear_recording_runs, open_recording_account_create_window, open_recording_account_edit_window,
+  open_recording_account_logs_window, recording_account_create, recording_account_delete, recording_account_detail,
+  recording_account_logs, recording_account_set_enabled, recording_account_update, recording_accounts_check,
+  recording_accounts_snapshot, resolve_recording_account_profile,
 };
 pub use settings::{
   select_export_directory, settings_check_update, settings_get, settings_update, token_validate,
