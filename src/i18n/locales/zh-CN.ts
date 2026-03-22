@@ -3,6 +3,7 @@ const zhCN = {
     sidebarTagline: '桌面工具集',
     back: '返回',
     forward: '前进',
+    github: 'GitHub',
   },
   navigation: {
     download: '视频下载',

@@ -8,3 +8,7 @@ export async function fetchSystemInfo(): Promise<SystemInfo> {
 export async function pingPython(): Promise<string> {
   return invoke<string>('python_ping');
 }
+
+export async function openExternalUrl(url: string): Promise<void> {
+  return invoke<void>('open_external_url', { url });
+}

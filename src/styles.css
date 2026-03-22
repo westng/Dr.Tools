@@ -148,6 +148,7 @@ select:focus-visible {
   min-height: 0;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
+  position: relative;
   overflow: hidden;
   scrollbar-width: none;
   -ms-overflow-style: none;
@@ -178,8 +179,11 @@ select:focus-visible {
   top: 0;
   z-index: 10;
   background: var(--bg-main);
+  margin-bottom: -72px;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
+  box-shadow: none;
+  isolation: isolate;
 }
 
 :root[data-theme='light'] .content-toolbar {
@@ -187,31 +191,35 @@ select:focus-visible {
 }
 
 :root[data-theme='light'][data-glass-style='transparent'] .content-toolbar {
-  background: color-mix(in srgb, #ffffff 72%, transparent);
+  background: color-mix(in srgb, #ffffff 68%, transparent);
   backdrop-filter: blur(16px) saturate(130%);
   -webkit-backdrop-filter: blur(16px) saturate(130%);
+  box-shadow: none;
 }
 
 :root[data-theme='light'][data-glass-style='tinted'] .content-toolbar {
   background: #ffffff;
+  box-shadow: none;
 }
 
 :root[data-glass-style='transparent'] .content-toolbar {
   backdrop-filter: blur(16px) saturate(130%);
   -webkit-backdrop-filter: blur(16px) saturate(130%);
-  background: color-mix(in srgb, var(--bg-main) 56%, transparent);
+  background: color-mix(in srgb, var(--bg-main) 48%, transparent);
+  box-shadow: none;
 }
 
 :root[data-glass-style='tinted'] .content-toolbar {
   background: var(--bg-main);
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
+  box-shadow: none;
 }
 
 .content-body {
   min-height: 0;
   height: 100%;
-  padding: 0 10px;
+  padding: 72px 10px 0;
   overflow: auto;
   scrollbar-width: none;
   -ms-overflow-style: none;
@@ -258,6 +266,38 @@ select:focus-visible {
   font-size: 30px;
   font-weight: 700;
   line-height: 1;
+}
+
+.toolbar-spacer {
+  flex: 1 1 auto;
+}
+
+.toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.toolbar-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-muted);
+  padding: 0;
+}
+
+.toolbar-action-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+.toolbar-action-btn:hover {
+  background: color-mix(in srgb, var(--bg-input) 86%, var(--accent) 14%);
 }
 
 .page-title {

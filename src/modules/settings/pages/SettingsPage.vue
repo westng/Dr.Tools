@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
+import { openExternalUrl } from '@/api/system.api';
 import { selectExportDirectory, validateToken } from '@/modules/settings/api/settings.api';
 import { useSettingsStore } from '@/modules/settings/stores/settings.store';
 import { useAppStore } from '@/stores/app.store';
@@ -228,9 +229,9 @@ function toggleGuide(platform: TokenPlatform): void {
   expandedGuide.value = expandedGuide.value === platform ? null : platform;
 }
 
-function openSite(platform: TokenPlatform): void {
+async function openSite(platform: TokenPlatform): Promise<void> {
   const url = platform === 'douyin' ? 'https://www.douyin.com/' : 'https://www.tiktok.com/';
-  window.open(url, '_blank', 'noopener,noreferrer');
+  await openExternalUrl(url);
 }
 
 async function setAutoCheck(enabled: boolean): Promise<void> {
@@ -494,7 +495,7 @@ async function checkUpdatesNow(): Promise<void> {
     <p v-if="error" class="danger-text">{{ error }}</p>
 
     <footer class="settings-footer">
-      <p>© 2026 Dr.SheetSplit. {{ text.footer }}</p>
+      <p>© 2026 Dr.Tools. {{ text.footer }}</p>
       <p>Author: west ng</p>
     </footer>
   </section>

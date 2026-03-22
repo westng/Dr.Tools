@@ -1,3 +1,5 @@
+use std::process::Command;
+
 use tauri::State;
 
 use crate::error::AppError;
@@ -40,5 +42,56 @@ pub fn frontend_log_error(scope: String, message: String, app: tauri::AppHandle)
     &app,
     &format!("frontend error scope={} message={}", normalized_scope, normalized_message),
   );
+  Ok(())
+}
+
+#[tauri::command]
+pub fn open_external_url(url: String) -> Result<(), AppError> {
+  let normalized_url = url.trim();
+  if !(normalized_url.starts_with("https://") || normalized_url.starts_with("http://")) {
+    return Err(AppError::Validation("url must start with http:// or https://".to_string()));
+  }
+
+  #[cfg(target_os = "macos")]
+  {
+    let open_status = Command::new("open").arg(normalized_url).status()?;
+    if !open_status.success() {
+      let escaped_url = normalized_url.replace('\\', "\\\\").replace('"', "\\\"");
+      let fallback_status = Command::new("osascript")
+        .args(["-e", &format!("open location \"{}\"", escaped_url)])
+        .status()?;
+
+      if !fallback_status.success() {
+        return Err(AppError::Io(format!(
+          "failed to open url with macOS handlers status_open={:?} status_osascript={:?}",
+          open_status.code(),
+          fallback_status.code()
+        )));
+      }
+    }
+  }
+
+  #[cfg(target_os = "windows")]
+  {
+    let status = Command::new("cmd").args(["/C", "start", "", normalized_url]).status()?;
+    if !status.success() {
+      return Err(AppError::Io(format!(
+        "failed to open url with Windows shell status={:?}",
+        status.code()
+      )));
+    }
+  }
+
+  #[cfg(all(unix, not(target_os = "macos")))]
+  {
+    let status = Command::new("xdg-open").arg(normalized_url).status()?;
+    if !status.success() {
+      return Err(AppError::Io(format!(
+        "failed to open url with xdg-open status={:?}",
+        status.code()
+      )));
+    }
+  }
+
   Ok(())
 }

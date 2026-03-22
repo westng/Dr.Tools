@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useRoute, useRouter } from 'vue-router';
+import { openExternalUrl } from '@/api/system.api';
 import SidebarNav from '@/layouts/SidebarNav.vue';
 import { useSettingsStore } from '@/modules/settings/stores/settings.store';
 import { translate } from '@/i18n';
@@ -93,6 +94,10 @@ async function goForward(): Promise<void> {
 
   await router.push(target);
 }
+
+async function openGithub(): Promise<void> {
+  await openExternalUrl('https://github.com/westng');
+}
 </script>
 
 <template>
@@ -127,6 +132,23 @@ async function goForward(): Promise<void> {
             </button>
           </div>
           <h2 class="toolbar-title">{{ pageTitle }}</h2>
+          <div class="toolbar-spacer"></div>
+          <div class="toolbar-actions">
+            <button
+              class="toolbar-action-btn"
+              type="button"
+              :aria-label="translate(settings.locale, 'app.github')"
+              :title="translate(settings.locale, 'app.github')"
+              @click="openGithub"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  fill="currentColor"
+                  d="M12 .5C5.649.5.5 5.653.5 12.01c0 5.086 3.292 9.383 7.86 10.906.575.106.785-.25.785-.556 0-.274-.01-1-.016-1.962-3.197.695-3.872-1.542-3.872-1.542-.523-1.33-1.278-1.684-1.278-1.684-1.045-.714.08-.7.08-.7 1.156.081 1.764 1.189 1.764 1.189 1.028 1.764 2.697 1.255 3.354.96.104-.746.402-1.255.731-1.544-2.552-.291-5.236-1.278-5.236-5.692 0-1.258.449-2.286 1.186-3.092-.12-.291-.514-1.464.112-3.052 0 0 .967-.31 3.17 1.181A11.04 11.04 0 0 1 12 6.32c.978.004 1.963.133 2.882.39 2.201-1.492 3.166-1.182 3.166-1.182.628 1.589.234 2.761.116 3.052.739.806 1.184 1.834 1.184 3.092 0 4.425-2.688 5.397-5.248 5.683.414.356.783 1.058.783 2.133 0 1.541-.013 2.784-.013 3.164 0 .309.207.668.792.555 4.563-1.525 7.85-5.821 7.85-10.904C23.5 5.653 18.351.5 12 .5Z"
+                />
+              </svg>
+            </button>
+          </div>
         </header>
         <section class="content-body">
           <router-view />

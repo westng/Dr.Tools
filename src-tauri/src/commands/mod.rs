@@ -13,7 +13,7 @@ pub use recording::{
 pub use settings::{
   select_export_directory, settings_check_update, settings_get, settings_update, token_validate,
 };
-pub use system::{frontend_log_error, python_ping, system_info};
+pub use system::{frontend_log_error, open_external_url, python_ping, system_info};
 pub use tasks::{
   download_batch_detail, download_batch_list, download_batch_retry, open_download_batch_detail_window,
   open_task_detail_window, task_batch_details, task_detail, task_list, task_run, video_download_submit,

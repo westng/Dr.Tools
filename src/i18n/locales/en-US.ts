@@ -3,6 +3,7 @@ const enUS = {
     sidebarTagline: 'Desktop toolkit',
     back: 'Back',
     forward: 'Forward',
+    github: 'GitHub',
   },
   navigation: {
     download: 'Video Download',
