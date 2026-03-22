@@ -59,6 +59,13 @@ pnpm check:desktop
 pnpm check
 ```
 
+## 设计系统预览
+
+- 设计系统文档：`DESIGN_SYSTEM.md`
+- 静态预览页：`design-system-preview.html`
+- 使用方式：直接在浏览器中打开根目录 `design-system-preview.html`
+- 维护要求：设计规则变更时，必须同步更新 `DESIGN_SYSTEM.md` 与 `design-system-preview.html`
+
 ## 项目结构
 
 ```text
