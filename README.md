@@ -116,6 +116,12 @@ src-tauri/                   桌面端宿主与后端能力
 - Rust 侧按 `commands -> services -> repositories -> domain` 的职责链拆分，避免 command 直接堆业务细节。
 - Python `main.py` 只负责协议入口，具体任务分发与实现分别放在 `src-tauri/python/core` 和 `src-tauri/python/tasks`。
 
+## 界面预览
+
+![Dr.Tools Screenshot 1](screenshots/ScreenShot_2026-03-22_184248_670.png)
+![Dr.Tools Screenshot 2](screenshots/ScreenShot_2026-03-22_184312_268.png)
+![Dr.Tools Screenshot 3](screenshots/ScreenShot_2026-03-22_184850_010.png)
+
 ## 参与贡献
 
 提交代码前请先阅读 `CONTRIBUTING.md`。
