@@ -1,11 +1,18 @@
 # Dr.Tools
 
+[![Desktop](https://img.shields.io/badge/Desktop-Tauri-blue)](#)
+[![Vue](https://img.shields.io/badge/Frontend-Vue%203-42b883)](#)
+[![Rust](https://img.shields.io/badge/Backend-Rust-black)](#)
+[![Python](https://img.shields.io/badge/Worker-Python-3776AB)](#)
+[![SQLite](https://img.shields.io/badge/Storage-SQLite-0f80cc)](#)
+[![语音](https://img.shields.io/badge/语音-Voice-informational)](#)
+
 Dr.Tools 是一个基于 Tauri、Vue、Rust、SQLite 和 Python 的桌面应用。
 当前主要聚焦于创作者媒体工作流，包括视频下载、任务记录和运行设置管理。
 
 > 说明：项目仍处于开发阶段，功能与实现会持续调整。
 >
-> 项目中的视频下载与直播录制能力基于开源项目 `F2` 进行集成与扩展。这里明确声明依赖来源，是为了遵循开源精神，尊重原项目工作，并尽量避免不必要的版权与归属争议。
+> 项目中的视频下载与直播录制能力基于开源项目 [`F2`](https://github.com/Johnserf-Seed/f2) 进行集成与扩展。这里明确声明依赖来源，是为了遵循开源精神，尊重原项目工作，并尽量避免不必要的版权与归属争议。
 
 ## 功能特性
 
@@ -69,45 +76,54 @@ pnpm check
 ## 项目结构
 
 ```text
-src/
-  App.vue
-  bootstrap.ts
-  main.ts
-  router/
-  navigation/
-  layouts/
-  modules/
-  api/
-  assets/
-  i18n/
-  lib/
-  stores/
-  theme/
+src/                         前端应用入口与界面层
+  App.vue                    应用壳与通用标题栏
+  main.ts                    前端启动入口
+  bootstrap.ts               应用初始化与全局错误接管
+  router/                    路由注册与页面入口
+  layouts/                   通用布局组件
+  navigation/                导航配置
+  modules/                   按业务拆分的前端模块
+    download/                视频下载
+    recording/               直播录制
+    tasks/                   任务记录与明细
+    settings/                设置与运行配置
+  api/                       通用 Tauri API 封装
+  stores/                    全局状态
+  i18n/                      多语言文案
+  theme/                     外观与主题逻辑
+  lib/                       通用工具函数
+  assets/                    静态资源
 
-src-tauri/
+src-tauri/                   桌面端宿主与后端能力
   src/
-    application/
-    commands/
-    domain/
-    repositories/
-    services/
-  python/
-    core/
-    tasks/
-  migrations/
+    main.rs                  Tauri 应用入口
+    application/             应用状态装配与启动逻辑
+    commands/                对前端暴露的 Tauri commands
+    domain/                  领域模型与类型
+    repositories/            SQLite 数据访问
+    services/                调度、Python 桥接与系统服务
+  python/                    Python sidecar 入口与任务实现
+    core/                    Python 任务分发与基础设施
+    tasks/                   Python 具体任务
+  migrations/                SQLite 迁移脚本
 ```
 
 ## 说明
 
-- 前端业务代码统一放在 `src/modules`
-- 通用前端能力放在 `src/api`、`src/i18n`、`src/lib`、`src/stores`、`src/theme`、`src/assets`
-- Tauri command 保持外部调用稳定，内部 Rust 代码按职责拆分
-- Python `main.py` 只负责协议入口，任务分发放在 `src-tauri/python/core`
+- 前端优先按业务模块组织，页面、类型、接口尽量收敛在 `src/modules/<业务>` 内。
+- 跨模块复用能力统一下沉到 `src/api`、`src/i18n`、`src/lib`、`src/stores`、`src/theme` 与 `src/assets`。
+- Rust 侧按 `commands -> services -> repositories -> domain` 的职责链拆分，避免 command 直接堆业务细节。
+- Python `main.py` 只负责协议入口，具体任务分发与实现分别放在 `src-tauri/python/core` 和 `src-tauri/python/tasks`。
 
 ## 参与贡献
 
 提交代码前请先阅读 `CONTRIBUTING.md`。
 
+## 鸣谢
+
+- 感谢 [`F2`](https://github.com/Johnserf-Seed/f2) 为项目提供支持。
+
 ## 开源协议
 
-项目采用 `MIT` 开源协议，详见 `LICENSE`。
+项目整体采用 `MIT` 开源协议，详见 `LICENSE`。
