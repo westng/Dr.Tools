@@ -9,6 +9,9 @@ on:
 permissions:
   contents: write
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   build-tauri:
     name: Build ${{ matrix.name }}
@@ -32,7 +35,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Install Linux system dependencies
         if: matrix.platform == 'ubuntu-22.04'
@@ -40,15 +43,10 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10.30.3
-
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
-          node-version: 20
+          node-version: 22
           cache: pnpm
 
       - name: Install Rust stable
@@ -63,18 +61,31 @@ jobs:
         with:
           workspaces: ./src-tauri -> target
 
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Activate pnpm
+        run: corepack prepare pnpm@10.30.3 --activate
+
       - name: Install frontend dependencies
         run: pnpm install --frozen-lockfile
 
       - name: Build release bundles
+        id: tauri-build
         if: github.event_name == 'workflow_dispatch'
         uses: tauri-apps/tauri-action@v0.6.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           args: ${{ matrix.args }}
-          uploadWorkflowArtifacts: true
-          workflowArtifactNamePattern: dr-tools-[platform]-[arch]-[bundle]
+
+      - name: Upload workflow artifacts
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v7
+        with:
+          name: dr-tools-${{ runner.os }}-${{ matrix.name }}
+          path: ${{ steps.tauri-build.outputs.artifactPaths }}
+          if-no-files-found: error
 
       - name: Build and publish release bundles
         if: startsWith(github.ref, 'refs/tags/v')
@@ -88,5 +99,3 @@ jobs:
           releaseBody: See the assets attached to this release for installable packages.
           releaseDraft: false
           prerelease: ${{ contains(github.ref_name, '-') }}
-          uploadWorkflowArtifacts: true
-          workflowArtifactNamePattern: dr-tools-[platform]-[arch]-[bundle]
