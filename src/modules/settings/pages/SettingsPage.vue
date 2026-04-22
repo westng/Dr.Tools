@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
+import { emit } from '@tauri-apps/api/event';
 import { openExternalUrl } from '@/api/system.api';
 import {
   downloadEnvironment,
@@ -8,6 +9,7 @@ import {
   selectExportDirectory,
   validateToken
 } from '@/modules/settings/api/settings.api';
+import { ENVIRONMENT_STATUS_SYNC_EVENT } from '@/modules/settings/events';
 import { useSettingsStore } from '@/modules/settings/stores/settings.store';
 import { useAppStore } from '@/stores/app.store';
 import { useMessages } from '@/i18n';
@@ -288,6 +290,7 @@ async function refreshEnvironmentStatus(): Promise<void> {
   environmentActionError.value = '';
   try {
     environmentStatus.value = await getEnvironmentStatus();
+    await emit(ENVIRONMENT_STATUS_SYNC_EVENT, environmentStatus.value);
   } catch (error) {
     environmentActionError.value = toErrorMessage(error);
   } finally {
@@ -300,6 +303,7 @@ async function downloadManagedEnvironment(): Promise<void> {
   environmentActionError.value = '';
   try {
     environmentStatus.value = await downloadEnvironment();
+    await emit(ENVIRONMENT_STATUS_SYNC_EVENT, environmentStatus.value);
   } catch (error) {
     environmentActionError.value = toErrorMessage(error);
     await refreshEnvironmentStatus();
@@ -455,6 +459,13 @@ async function downloadManagedEnvironment(): Promise<void> {
           <span class="settings-label">{{ text.environmentVersion }}</span>
           <div class="setting-control">
             <span class="settings-hint">{{ environmentStatus?.pythonVersion || '3.12' }}</span>
+          </div>
+        </div>
+
+        <div class="setting-row">
+          <span class="settings-label">{{ text.environmentFfmpegVersion }}</span>
+          <div class="setting-control">
+            <span class="settings-hint">{{ environmentStatus?.ffmpegVersion || '4.1.0' }}</span>
           </div>
         </div>
 

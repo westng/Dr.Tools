@@ -18,6 +18,10 @@ pub const MANAGED_PYTHON_RELEASE: &str = "20260203";
 pub const MANAGED_PYTHON_SOURCE_LABEL: &str = "NJU Mirror · python-build-standalone";
 pub const MANAGED_PYTHON_SOURCE_BASE_URL: &str =
   "https://mirror.nju.edu.cn/github-release/astral-sh/python-build-standalone";
+pub const MANAGED_FFMPEG_VERSION: &str = "4.1.0";
+pub const MANAGED_FFMPEG_ARM64_MACOS_VERSION: &str = "4.1.5";
+pub const MANAGED_FFMPEG_SOURCE_LABEL: &str = "npmmirror · @ffmpeg-installer";
+pub const MANAGED_FFMPEG_SOURCE_BASE_URL: &str = "https://registry.npmmirror.com";
 
 struct PythonProcess {
   child: Child,
@@ -260,10 +264,11 @@ fn resolve_python_launch(app: &AppHandle) -> Result<(String, Vec<String>, Option
 
   if let Some(runtime_bin) = managed_runtime_bin_path(app) {
     let script = resolve_python_script_path(app)?;
+    let work_dir = resolve_python_work_dir(app)?;
     return Ok((
       runtime_bin.to_string_lossy().to_string(),
       vec![script.to_string_lossy().to_string()],
-      None,
+      Some(work_dir),
     ));
   }
 
@@ -293,10 +298,11 @@ fn resolve_python_launch(app: &AppHandle) -> Result<(String, Vec<String>, Option
   };
 
   if runtime_bin.exists() && script_path.exists() {
+    let work_dir = resolve_python_work_dir(app)?;
     return Ok((
       runtime_bin.to_string_lossy().to_string(),
       vec![script_path.to_string_lossy().to_string()],
-      Some(resource_dir),
+      Some(work_dir),
     ));
   }
 
@@ -312,6 +318,15 @@ pub fn managed_runtime_root(app: &AppHandle) -> Option<PathBuf> {
       .join("python-runtime-managed")
       .join(format!("python-{}", MANAGED_PYTHON_VERSION)),
   )
+}
+
+pub fn resolve_python_work_dir(app: &AppHandle) -> Result<PathBuf, AppError> {
+  let dir = app
+    .path()
+    .app_data_dir()
+    .map_err(|e| AppError::Io(e.to_string()))?;
+  fs::create_dir_all(&dir)?;
+  Ok(dir)
 }
 
 pub fn managed_runtime_bin_path(app: &AppHandle) -> Option<PathBuf> {
@@ -349,6 +364,38 @@ pub fn resolve_python_script_path(app: &AppHandle) -> Result<PathBuf, AppError> 
     Err(AppError::PythonStart(
       "python main script not found in bundled resources".to_string(),
     ))
+  }
+}
+
+pub fn managed_ffmpeg_root(app: &AppHandle) -> Option<PathBuf> {
+  let base = app.path().app_data_dir().ok()?;
+  Some(
+    base
+      .join("ffmpeg-managed")
+      .join(format!("ffmpeg-{}", managed_ffmpeg_version())),
+  )
+}
+
+pub fn managed_ffmpeg_bin_path(app: &AppHandle) -> Option<PathBuf> {
+  let root = managed_ffmpeg_root(app)?;
+  let bin = if cfg!(target_os = "windows") {
+    root.join("package").join("ffmpeg.exe")
+  } else {
+    root.join("package").join("ffmpeg")
+  };
+
+  if bin.exists() {
+    Some(bin)
+  } else {
+    None
+  }
+}
+
+pub fn managed_ffmpeg_version() -> &'static str {
+  if cfg!(target_os = "macos") && cfg!(target_arch = "aarch64") {
+    MANAGED_FFMPEG_ARM64_MACOS_VERSION
+  } else {
+    MANAGED_FFMPEG_VERSION
   }
 }
 

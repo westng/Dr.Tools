@@ -357,10 +357,12 @@ pub struct UpdateCheckResult {
 #[serde(rename_all = "camelCase")]
 pub struct ManagedEnvironmentStatus {
   pub python_version: String,
+  pub ffmpeg_version: String,
   pub source_label: String,
   pub source_url: String,
   pub install_dir: String,
   pub python_bin: Option<String>,
+  pub ffmpeg_bin: Option<String>,
   pub installed: bool,
   pub status: String,
   pub message: String,

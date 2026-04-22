@@ -15,7 +15,7 @@ use crate::application::AppState;
 use crate::domain::{RecordingAccountItem, RecordingLiveStatusResult};
 use crate::error::AppError;
 use crate::repositories::Db;
-use crate::services::python::managed_runtime_bin_path;
+use crate::services::python::{managed_ffmpeg_bin_path, managed_runtime_bin_path, resolve_python_work_dir};
 use crate::services::runtime_log::append_runtime_log;
 
 const DEFAULT_MAX_CONCURRENT_RECORDINGS: usize = 3;
@@ -431,6 +431,10 @@ fn spawn_recording_worker(app: &AppHandle, task_id: &str) -> Result<Child, AppEr
     .stdout(Stdio::null())
     .stderr(resolve_worker_stderr(app));
 
+  if let Some(ffmpeg_bin) = managed_ffmpeg_bin_path(app) {
+    command.env("DRTOOLS_FFMPEG_BIN", ffmpeg_bin);
+  }
+
   if let Some(cwd) = cwd {
     command.current_dir(cwd);
   }
@@ -447,10 +451,11 @@ fn resolve_recording_worker_launch(app: &AppHandle) -> Result<(String, String, O
 
   if let Some(runtime_bin) = managed_runtime_bin_path(app) {
     let script = resolve_managed_recording_worker_script(app)?;
+    let work_dir = resolve_python_work_dir(app)?;
     return Ok((
       runtime_bin.to_string_lossy().to_string(),
       script.to_string_lossy().to_string(),
-      None,
+      Some(work_dir),
     ));
   }
 
@@ -473,10 +478,11 @@ fn resolve_recording_worker_launch(app: &AppHandle) -> Result<(String, String, O
   };
 
   if runtime_bin.exists() && script_path.exists() {
+    let work_dir = resolve_python_work_dir(app)?;
     return Ok((
       runtime_bin.to_string_lossy().to_string(),
       script_path.to_string_lossy().to_string(),
-      Some(resource_dir),
+      Some(work_dir),
     ));
   }
 

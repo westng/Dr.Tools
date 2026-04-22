@@ -64,10 +64,12 @@ export type ManagedEnvironmentState = 'missing' | 'ready' | 'invalid';
 
 export interface ManagedEnvironmentStatus {
   pythonVersion: string;
+  ffmpegVersion: string;
   sourceLabel: string;
   sourceUrl: string;
   installDir: string;
   pythonBin?: string | null;
+  ffmpegBin?: string | null;
   installed: boolean;
   status: ManagedEnvironmentState;
   message: string;

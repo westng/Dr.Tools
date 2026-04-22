@@ -1,5 +1,6 @@
 import asyncio
 import json
+import os
 import signal
 import sqlite3
 import subprocess
@@ -251,8 +252,9 @@ def download_cover_if_needed(url: str | None, destination: Path) -> Path | None:
 
 
 def build_ffmpeg_command(stream_url: str, output_path: Path, split_recording: bool) -> list[str]:
+    ffmpeg_bin = os.environ.get("DRTOOLS_FFMPEG_BIN", "").strip() or "ffmpeg"
     command = [
-        "ffmpeg",
+        ffmpeg_bin,
         "-y",
         "-hide_banner",
         "-nostdin",

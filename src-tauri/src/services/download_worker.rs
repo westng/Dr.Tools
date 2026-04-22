@@ -6,7 +6,7 @@ use std::process::{Command, Stdio};
 use tauri::{AppHandle, Manager};
 
 use crate::error::AppError;
-use crate::services::python::managed_runtime_bin_path;
+use crate::services::python::{managed_runtime_bin_path, resolve_python_work_dir};
 use crate::services::runtime_log::append_runtime_log;
 
 pub fn launch_batch_worker(app: &AppHandle, batch_id: &str) -> Result<(), AppError> {
@@ -53,10 +53,11 @@ fn resolve_batch_worker_launch(app: &AppHandle) -> Result<(String, String, Optio
 
   if let Some(runtime_bin) = managed_runtime_bin_path(app) {
     let script = resolve_managed_batch_worker_script(app)?;
+    let work_dir = resolve_python_work_dir(app)?;
     return Ok((
       runtime_bin.to_string_lossy().to_string(),
       script.to_string_lossy().to_string(),
-      None,
+      Some(work_dir),
     ));
   }
 
@@ -79,10 +80,11 @@ fn resolve_batch_worker_launch(app: &AppHandle) -> Result<(String, String, Optio
   };
 
   if runtime_bin.exists() && script_path.exists() {
+    let work_dir = resolve_python_work_dir(app)?;
     return Ok((
       runtime_bin.to_string_lossy().to_string(),
       script_path.to_string_lossy().to_string(),
-      Some(resource_dir),
+      Some(work_dir),
     ));
   }
 

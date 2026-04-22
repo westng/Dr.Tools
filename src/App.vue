@@ -1,12 +1,15 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useRoute, useRouter } from 'vue-router';
+import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { openExternalUrl } from '@/api/system.api';
 import SidebarNav from '@/layouts/SidebarNav.vue';
 import { getEnvironmentStatus } from '@/modules/settings/api/settings.api';
+import { ENVIRONMENT_STATUS_SYNC_EVENT } from '@/modules/settings/events';
 import { useSettingsStore } from '@/modules/settings/stores/settings.store';
 import { translate } from '@/i18n';
+import type { ManagedEnvironmentStatus } from '@/modules/settings/types';
 
 const settingsStore = useSettingsStore();
 const { settings } = storeToRefs(settingsStore);
@@ -16,6 +19,7 @@ const router = useRouter();
 const routeHistory = ref<string[]>([]);
 const routeHistoryIndex = ref(-1);
 const pythonEnvironmentInstalled = ref(false);
+let unlistenEnvironmentStatus: UnlistenFn | null = null;
 
 const pageTitle = computed(() => {
   const titleKey = String(route.meta.titleKey ?? 'routes.workbench');
@@ -46,7 +50,15 @@ watch(
 );
 
 onMounted(async () => {
+  unlistenEnvironmentStatus = await listen<ManagedEnvironmentStatus>(ENVIRONMENT_STATUS_SYNC_EVENT, (event) => {
+    pythonEnvironmentInstalled.value = event.payload.installed && event.payload.status === 'ready';
+  });
   await refreshPythonEnvironmentStatus();
+});
+
+onBeforeUnmount(() => {
+  unlistenEnvironmentStatus?.();
+  unlistenEnvironmentStatus = null;
 });
 
 function syncRouteHistory(path: string): void {

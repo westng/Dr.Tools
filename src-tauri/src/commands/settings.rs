@@ -15,8 +15,10 @@ use crate::domain::{
 };
 use crate::error::AppError;
 use crate::services::python::{
-  managed_runtime_bin_path, managed_runtime_root, MANAGED_PYTHON_RELEASE, MANAGED_PYTHON_SOURCE_BASE_URL,
-  MANAGED_PYTHON_SOURCE_LABEL, MANAGED_PYTHON_VERSION,
+  managed_ffmpeg_bin_path, managed_ffmpeg_root, managed_ffmpeg_version, managed_runtime_bin_path,
+  managed_runtime_root, MANAGED_FFMPEG_ARM64_MACOS_VERSION, MANAGED_FFMPEG_SOURCE_BASE_URL,
+  MANAGED_FFMPEG_SOURCE_LABEL, MANAGED_FFMPEG_VERSION, MANAGED_PYTHON_RELEASE,
+  MANAGED_PYTHON_SOURCE_BASE_URL, MANAGED_PYTHON_SOURCE_LABEL, MANAGED_PYTHON_VERSION,
 };
 
 const KEY_THEME_MODE: &str = "settings.theme_mode";
@@ -457,43 +459,47 @@ fn validate_download_platform(value: &str) -> Result<(), AppError> {
 fn read_environment_status(app: &AppHandle) -> Result<ManagedEnvironmentStatus, AppError> {
   let install_dir = managed_runtime_root(app)
     .ok_or_else(|| AppError::Io("failed to resolve app data directory".to_string()))?;
-  let source_url = resolve_python_archive_url()?;
+  let source_url = resolve_ffmpeg_archive_url()?;
+  let python_bin = managed_runtime_bin_path(app);
+  let ffmpeg_bin = managed_ffmpeg_bin_path(app);
+  let python_ready = python_bin
+    .as_ref()
+    .map(|bin| validate_managed_runtime(bin).is_ok())
+    .unwrap_or(false);
+  let ffmpeg_ready = ffmpeg_bin
+    .as_ref()
+    .map(|bin| validate_managed_ffmpeg(bin).is_ok())
+    .unwrap_or(false);
 
-  if let Some(python_bin) = managed_runtime_bin_path(app) {
-    if validate_managed_runtime(&python_bin).is_ok() {
-      return Ok(ManagedEnvironmentStatus {
-        python_version: MANAGED_PYTHON_VERSION.to_string(),
-        source_label: MANAGED_PYTHON_SOURCE_LABEL.to_string(),
-        source_url,
-        install_dir: install_dir.to_string_lossy().to_string(),
-        python_bin: Some(python_bin.to_string_lossy().to_string()),
-        installed: true,
-        status: "ready".to_string(),
-        message: "内置 Python 环境已就绪，可用于 Token 校验和任务执行。".to_string(),
-      });
-    }
-
-    return Ok(ManagedEnvironmentStatus {
-      python_version: MANAGED_PYTHON_VERSION.to_string(),
-      source_label: MANAGED_PYTHON_SOURCE_LABEL.to_string(),
-      source_url,
-      install_dir: install_dir.to_string_lossy().to_string(),
-      python_bin: Some(python_bin.to_string_lossy().to_string()),
-      installed: true,
-      status: "invalid".to_string(),
-      message: "检测到环境目录，但依赖未完成安装，请重新下载环境。".to_string(),
-    });
-  }
+  let (installed, status, message) = match (python_ready, ffmpeg_ready) {
+    (true, true) => (
+      true,
+      "ready".to_string(),
+      "Python 与 FFmpeg 环境已就绪，可用于 Token 校验、下载和直播录制。".to_string(),
+    ),
+    _ if python_bin.is_none() && ffmpeg_bin.is_none() => (
+      false,
+      "missing".to_string(),
+      "当前尚未下载内置 Python 与 FFmpeg 环境。".to_string(),
+    ),
+    _ => (
+      true,
+      "invalid".to_string(),
+      "检测到环境目录，但 Python 或 FFmpeg 未完整安装，请重新下载环境。".to_string(),
+    ),
+  };
 
   Ok(ManagedEnvironmentStatus {
     python_version: MANAGED_PYTHON_VERSION.to_string(),
-    source_label: MANAGED_PYTHON_SOURCE_LABEL.to_string(),
+    ffmpeg_version: managed_ffmpeg_version().to_string(),
+    source_label: format!("{} + {}", MANAGED_PYTHON_SOURCE_LABEL, MANAGED_FFMPEG_SOURCE_LABEL),
     source_url,
     install_dir: install_dir.to_string_lossy().to_string(),
-    python_bin: None,
-    installed: false,
-    status: "missing".to_string(),
-    message: "当前尚未下载内置 Python 环境。".to_string(),
+    python_bin: python_bin.map(|path| path.to_string_lossy().to_string()),
+    ffmpeg_bin: ffmpeg_bin.map(|path| path.to_string_lossy().to_string()),
+    installed,
+    status,
+    message,
   })
 }
 
@@ -524,7 +530,30 @@ fn install_managed_environment(app: &AppHandle) -> Result<ManagedEnvironmentStat
   fs::rename(&temp_dir, &install_dir)?;
   let _ = fs::remove_file(&archive_path);
 
+  install_managed_ffmpeg(app)?;
+
   read_environment_status(app)
+}
+
+fn resolve_ffmpeg_archive_url() -> Result<String, AppError> {
+  let (package_name, version) = match (std::env::consts::OS, std::env::consts::ARCH) {
+    ("windows", "x86_64") => ("win32-x64", MANAGED_FFMPEG_VERSION),
+    ("linux", "x86_64") => ("linux-x64", MANAGED_FFMPEG_VERSION),
+    ("macos", "x86_64") => ("darwin-x64", MANAGED_FFMPEG_VERSION),
+    ("macos", "aarch64") => ("darwin-arm64", MANAGED_FFMPEG_ARM64_MACOS_VERSION),
+    _ => {
+      return Err(AppError::Validation(format!(
+        "managed ffmpeg is not available for {} {}",
+        std::env::consts::OS,
+        std::env::consts::ARCH
+      )))
+    }
+  };
+
+  Ok(format!(
+    "{}/@ffmpeg-installer/{}/-/{}-{}.tgz",
+    MANAGED_FFMPEG_SOURCE_BASE_URL, package_name, package_name, version
+  ))
 }
 
 fn resolve_python_archive_url() -> Result<String, AppError> {
@@ -595,6 +624,22 @@ fn resolve_python_bin_in_root(root: &Path) -> Result<PathBuf, AppError> {
   }
 }
 
+fn resolve_ffmpeg_bin_in_root(root: &Path) -> Result<PathBuf, AppError> {
+  let bin = if cfg!(target_os = "windows") {
+    root.join("package").join("ffmpeg.exe")
+  } else {
+    root.join("package").join("ffmpeg")
+  };
+
+  if bin.exists() {
+    Ok(bin)
+  } else {
+    Err(AppError::TaskExec(
+      "downloaded ffmpeg package does not contain a usable executable".to_string(),
+    ))
+  }
+}
+
 fn ensure_runtime_requirements(app: &AppHandle, runtime_root: &Path, python_bin: &Path) -> Result<(), AppError> {
   let requirements_path = resolve_runtime_requirements_file(app)?;
 
@@ -635,6 +680,35 @@ fn ensure_runtime_requirements(app: &AppHandle, runtime_root: &Path, python_bin:
   validate_managed_runtime(python_bin)
 }
 
+fn install_managed_ffmpeg(app: &AppHandle) -> Result<(), AppError> {
+  let install_dir = managed_ffmpeg_root(app)
+    .ok_or_else(|| AppError::Io("failed to resolve ffmpeg app data directory".to_string()))?;
+  let base_dir = install_dir
+    .parent()
+    .ok_or_else(|| AppError::Io("failed to resolve ffmpeg install directory".to_string()))?;
+  fs::create_dir_all(base_dir)?;
+
+  let archive_url = resolve_ffmpeg_archive_url()?;
+  let archive_path = base_dir.join("ffmpeg-runtime.tgz");
+  let temp_dir = base_dir.join(format!("ffmpeg-{}.tmp", managed_ffmpeg_version()));
+
+  if temp_dir.exists() {
+    fs::remove_dir_all(&temp_dir)?;
+  }
+
+  download_archive(&archive_url, &archive_path)?;
+  extract_archive(&archive_path, &temp_dir)?;
+  let ffmpeg_bin = resolve_ffmpeg_bin_in_root(&temp_dir)?;
+  validate_managed_ffmpeg(&ffmpeg_bin)?;
+
+  if install_dir.exists() {
+    fs::remove_dir_all(&install_dir)?;
+  }
+  fs::rename(&temp_dir, &install_dir)?;
+  let _ = fs::remove_file(&archive_path);
+  Ok(())
+}
+
 fn validate_managed_runtime(python_bin: &Path) -> Result<(), AppError> {
   let status = Command::new(python_bin)
     .arg("-c")
@@ -648,6 +722,19 @@ fn validate_managed_runtime(python_bin: &Path) -> Result<(), AppError> {
     Err(AppError::TaskExec(
       "managed environment verification failed".to_string(),
     ))
+  }
+}
+
+fn validate_managed_ffmpeg(ffmpeg_bin: &Path) -> Result<(), AppError> {
+  let status = Command::new(ffmpeg_bin)
+    .arg("-version")
+    .status()
+    .map_err(|error| AppError::TaskExec(format!("failed to verify ffmpeg: {}", error)))?;
+
+  if status.success() {
+    Ok(())
+  } else {
+    Err(AppError::TaskExec("managed ffmpeg verification failed".to_string()))
   }
 }
 
