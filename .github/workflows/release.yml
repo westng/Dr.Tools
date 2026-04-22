@@ -47,7 +47,7 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: 22
-          cache: pnpm
+          package-manager-cache: false
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
@@ -61,11 +61,8 @@ jobs:
         with:
           workspaces: ./src-tauri -> target
 
-      - name: Enable Corepack
-        run: corepack enable
-
-      - name: Activate pnpm
-        run: corepack prepare pnpm@10.30.3 --activate
+      - name: Install pnpm
+        run: npm install --global pnpm@10.30.3
 
       - name: Install frontend dependencies
         run: pnpm install --frozen-lockfile
