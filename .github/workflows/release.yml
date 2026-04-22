@@ -81,8 +81,8 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: dr-tools-${{ runner.os }}-${{ matrix.name }}
-          path: ${{ join(fromJSON(steps.tauri-build.outputs.artifactPaths), '
-            ') }}
+          path: |
+            src-tauri/target/**/release/bundle/**
           if-no-files-found: error
 
       - name: Build and publish release bundles
