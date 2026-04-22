@@ -1,6 +1,6 @@
 [package]
 name = "dr-tools"
-version = "0.1.3"
+version = "0.1.4"
 description = "Dr.Tools desktop foundation"
 authors = ["west"]
 edition = "2021"
