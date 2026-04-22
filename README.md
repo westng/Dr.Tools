@@ -87,6 +87,7 @@ pnpm check
 - 已新增 GitHub Actions 工作流：`.github/workflows/release.yml`
 - 手动构建：在 GitHub 仓库的 Actions 页面运行 `release` 工作流，可生成各平台构建产物并作为 workflow artifacts 上传
 - 自动发版：推送 `v*` 格式标签，例如 `v0.1.0`，会自动构建并创建 GitHub Release，上传对应安装包
+- Release 文案：自动生成 `Downloads / Highlights / Notes` 三段式说明，兼顾用户下载指引与版本提示
 - 当前工作流覆盖平台：macOS Apple Silicon、macOS Intel、Linux、Windows
 - 如需启用正式签名，后续可在仓库 Secrets 中补充 macOS / Windows 的签名凭据
 
