@@ -1,11 +1,27 @@
-# Dr.Tools
+<p align="center">
+  <img src="https://avatars.githubusercontent.com/u/277389313?s=200&v=4" width="128" height="128" alt="Dr.Tools">
+</p>
 
-[![Desktop](https://img.shields.io/badge/Desktop-Tauri-blue)](#)
-[![Vue](https://img.shields.io/badge/Frontend-Vue%203-42b883)](#)
-[![Rust](https://img.shields.io/badge/Backend-Rust-black)](#)
-[![Python](https://img.shields.io/badge/Worker-Python-3776AB)](#)
-[![SQLite](https://img.shields.io/badge/Storage-SQLite-0f80cc)](#)
-[![语音](https://img.shields.io/badge/语音-Voice-informational)](#)
+<h1 align="center">Dr.Tools</h1>
+
+<p align="center">
+  面向创作者媒体工作流的桌面工具箱。
+</p>
+
+<p align="center">
+  桌面应用 · 视频下载 · 任务管理 · 设置管理 · Tauri 集成
+</p>
+
+<p align="center">
+  <a href="package.json"><img src="https://img.shields.io/badge/Desktop-App-4F46E5" alt="Desktop App"></a>
+  <a href="src-tauri/Cargo.toml"><img src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri" alt="Tauri 2"></a>
+  <a href="package.json"><img src="https://img.shields.io/badge/Stack-Vue%203%20%2B%20Rust-42B883?logo=vue.js" alt="Vue 3 and Rust"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License"></a>
+</p>
+
+<p align="center">
+  简体中文 | <a href="README.en.md">English</a>
+</p>
 
 Dr.Tools 是一个基于 Tauri、Vue、Rust、SQLite 和 Python 的桌面应用。
 当前主要聚焦于创作者媒体工作流，包括视频下载、任务记录和运行设置管理。
@@ -65,6 +81,14 @@ pnpm build
 pnpm check:desktop
 pnpm check
 ```
+
+## 构建与发版
+
+- 已新增 GitHub Actions 工作流：`.github/workflows/release.yml`
+- 手动构建：在 GitHub 仓库的 Actions 页面运行 `release` 工作流，可生成各平台构建产物并作为 workflow artifacts 上传
+- 自动发版：推送 `v*` 格式标签，例如 `v0.1.0`，会自动构建并创建 GitHub Release，上传对应安装包
+- 当前工作流覆盖平台：macOS Apple Silicon、macOS Intel、Linux、Windows
+- 如需启用正式签名，后续可在仓库 Secrets 中补充 macOS / Windows 的签名凭据
 
 ## 设计系统预览
 
