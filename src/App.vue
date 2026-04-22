@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useRoute, useRouter } from 'vue-router';
 import { openExternalUrl } from '@/api/system.api';
 import SidebarNav from '@/layouts/SidebarNav.vue';
+import { getEnvironmentStatus } from '@/modules/settings/api/settings.api';
 import { useSettingsStore } from '@/modules/settings/stores/settings.store';
 import { translate } from '@/i18n';
 
@@ -14,10 +15,17 @@ const router = useRouter();
 
 const routeHistory = ref<string[]>([]);
 const routeHistoryIndex = ref(-1);
+const pythonEnvironmentInstalled = ref(false);
 
 const pageTitle = computed(() => {
   const titleKey = String(route.meta.titleKey ?? 'routes.workbench');
   return translate(settings.value.locale, titleKey);
+});
+
+const pythonEnvironmentLabel = computed(() => {
+  return pythonEnvironmentInstalled.value
+    ? translate(settings.value.locale, 'app.pythonEnvReady')
+    : translate(settings.value.locale, 'app.pythonEnvMissing');
 });
 
 const isStandalonePage = computed(() => route.meta.standalone === true);
@@ -36,6 +44,10 @@ watch(
   },
   { immediate: true }
 );
+
+onMounted(async () => {
+  await refreshPythonEnvironmentStatus();
+});
 
 function syncRouteHistory(path: string): void {
   if (!path) {
@@ -98,6 +110,15 @@ async function goForward(): Promise<void> {
 async function openGithub(): Promise<void> {
   await openExternalUrl('https://github.com/westng');
 }
+
+async function refreshPythonEnvironmentStatus(): Promise<void> {
+  try {
+    const status = await getEnvironmentStatus();
+    pythonEnvironmentInstalled.value = status.installed && status.status === 'ready';
+  } catch {
+    pythonEnvironmentInstalled.value = false;
+  }
+}
 </script>
 
 <template>
@@ -134,6 +155,17 @@ async function openGithub(): Promise<void> {
           <h2 class="toolbar-title">{{ pageTitle }}</h2>
           <div class="toolbar-spacer"></div>
           <div class="toolbar-actions">
+            <button
+              class="toolbar-env-status"
+              type="button"
+              :class="{ ready: pythonEnvironmentInstalled }"
+              :aria-label="pythonEnvironmentLabel"
+              :title="pythonEnvironmentLabel"
+              @click="refreshPythonEnvironmentStatus"
+            >
+              <span class="toolbar-env-dot"></span>
+              <span>{{ pythonEnvironmentLabel }}</span>
+            </button>
             <button
               class="toolbar-action-btn"
               type="button"

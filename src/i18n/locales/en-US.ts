@@ -4,6 +4,8 @@ const enUS = {
     back: 'Back',
     forward: 'Forward',
     github: 'GitHub',
+    pythonEnvMissing: 'Environment not installed',
+    pythonEnvReady: 'PY environment ready',
   },
   navigation: {
     download: 'Video Download',

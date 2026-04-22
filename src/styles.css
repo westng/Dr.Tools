@@ -300,6 +300,41 @@ select:focus-visible {
   background: color-mix(in srgb, var(--bg-input) 86%, var(--accent) 14%);
 }
 
+.toolbar-env-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 32px;
+  border: none;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
+  color: var(--danger);
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.toolbar-env-status:hover {
+  background: color-mix(in srgb, var(--danger) 16%, transparent);
+}
+
+.toolbar-env-status.ready {
+  background: color-mix(in srgb, #1f8b4c 10%, transparent);
+  color: #1f8b4c;
+}
+
+.toolbar-env-status.ready:hover {
+  background: color-mix(in srgb, #1f8b4c 16%, transparent);
+}
+
+.toolbar-env-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: currentColor;
+  box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 18%, transparent);
+}
+
 .page-title {
   margin: 0 0 8px;
   font-size: 20px;

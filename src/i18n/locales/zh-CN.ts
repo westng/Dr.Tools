@@ -4,6 +4,8 @@ const zhCN = {
     back: '返回',
     forward: '前进',
     github: 'GitHub',
+    pythonEnvMissing: '没有安装环境',
+    pythonEnvReady: 'PY 环境已就绪',
   },
   navigation: {
     download: '视频下载',
