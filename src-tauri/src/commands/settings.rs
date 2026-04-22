@@ -51,6 +51,7 @@ const DEFAULT_LOCALE: &str = "zh-CN";
 const DEFAULT_MAX_CONCURRENT_DOWNLOADS: u32 = 3;
 const STATUS_NOT_CONFIGURED: &str = "not_configured";
 const STATUS_UNCHECKED: &str = "unchecked";
+const MANAGED_RUNTIME_INSTALL_LOG: &str = "managed-runtime-install.log";
 
 #[tauri::command]
 pub fn settings_get(state: State<'_, AppState>, app: AppHandle) -> Result<AppSettings, AppError> {
@@ -520,6 +521,7 @@ fn install_managed_environment(app: &AppHandle) -> Result<ManagedEnvironmentStat
     fs::remove_dir_all(&temp_dir)?;
   }
 
+  reset_environment_install_log(app);
   download_archive(&archive_url, &archive_path)?;
   extract_archive(&archive_path, &temp_dir)?;
   let python_bin = resolve_python_bin_in_root(&temp_dir)?;
@@ -643,8 +645,7 @@ fn resolve_ffmpeg_bin_in_root(root: &Path) -> Result<PathBuf, AppError> {
 
 fn ensure_runtime_requirements(app: &AppHandle, runtime_root: &Path, python_bin: &Path) -> Result<(), AppError> {
   let requirements_path = resolve_runtime_requirements_file(app)?;
-  let (ensurepip_stdout, ensurepip_stderr) =
-    resolve_environment_command_stdio(app, "managed-runtime-install.log");
+  let (ensurepip_stdout, ensurepip_stderr) = resolve_environment_command_stdio(app);
 
   let mut ensurepip_command = Command::new(python_bin);
   ensurepip_command
@@ -656,15 +657,19 @@ fn ensure_runtime_requirements(app: &AppHandle, runtime_root: &Path, python_bin:
     .current_dir(runtime_root);
   let ensurepip_status = configure_background_command(&mut ensurepip_command)
     .status()
-    .map_err(|error| AppError::TaskExec(format!("failed to bootstrap pip: {}", error)))?;
+    .map_err(|error| environment_install_error(app, &format!("failed to bootstrap pip: {}", error)))?;
 
   if !ensurepip_status.success() {
-    return Err(AppError::TaskExec(
-      "failed to bootstrap pip inside managed environment".to_string(),
+    return Err(environment_install_error(
+      app,
+      &format!(
+        "failed to bootstrap pip inside managed environment (exit code: {:?})",
+        ensurepip_status.code()
+      ),
     ));
   }
 
-  let (install_stdout, install_stderr) = resolve_environment_command_stdio(app, "managed-runtime-install.log");
+  let (install_stdout, install_stderr) = resolve_environment_command_stdio(app);
   let mut install_command = Command::new(python_bin);
   install_command
     .arg("-m")
@@ -682,15 +687,19 @@ fn ensure_runtime_requirements(app: &AppHandle, runtime_root: &Path, python_bin:
     .current_dir(runtime_root);
   let install_status = configure_background_command(&mut install_command)
     .status()
-    .map_err(|error| AppError::TaskExec(format!("failed to install runtime dependencies: {}", error)))?;
+    .map_err(|error| environment_install_error(app, &format!("failed to install runtime dependencies: {}", error)))?;
 
   if !install_status.success() {
-    return Err(AppError::TaskExec(
-      "failed to install runtime dependencies into managed environment".to_string(),
+    return Err(environment_install_error(
+      app,
+      &format!(
+        "failed to install runtime dependencies into managed environment (exit code: {:?})",
+        install_status.code()
+      ),
     ));
   }
 
-  validate_managed_runtime(python_bin)
+  validate_managed_runtime_during_install(app, python_bin)
 }
 
 fn install_managed_ffmpeg(app: &AppHandle) -> Result<(), AppError> {
@@ -712,7 +721,7 @@ fn install_managed_ffmpeg(app: &AppHandle) -> Result<(), AppError> {
   download_archive(&archive_url, &archive_path)?;
   extract_archive(&archive_path, &temp_dir)?;
   let ffmpeg_bin = resolve_ffmpeg_bin_in_root(&temp_dir)?;
-  validate_managed_ffmpeg(&ffmpeg_bin)?;
+  validate_managed_ffmpeg_during_install(app, &ffmpeg_bin)?;
 
   if install_dir.exists() {
     fs::remove_dir_all(&install_dir)?;
@@ -742,6 +751,28 @@ fn validate_managed_runtime(python_bin: &Path) -> Result<(), AppError> {
   }
 }
 
+fn validate_managed_runtime_during_install(app: &AppHandle, python_bin: &Path) -> Result<(), AppError> {
+  let (stdout, stderr) = resolve_environment_command_stdio(app);
+  let mut command = Command::new(python_bin);
+  command
+    .arg("-c")
+    .arg("import f2, httpx, sys; print(sys.version)")
+    .stdout(stdout)
+    .stderr(stderr);
+  let status = configure_background_command(&mut command)
+    .status()
+    .map_err(|error| environment_install_error(app, &format!("failed to verify managed environment: {}", error)))?;
+
+  if status.success() {
+    Ok(())
+  } else {
+    Err(environment_install_error(
+      app,
+      &format!("managed environment verification failed (exit code: {:?})", status.code()),
+    ))
+  }
+}
+
 fn validate_managed_ffmpeg(ffmpeg_bin: &Path) -> Result<(), AppError> {
   let mut command = Command::new(ffmpeg_bin);
   command.arg("-version").stdout(Stdio::null()).stderr(Stdio::null());
@@ -753,6 +784,24 @@ fn validate_managed_ffmpeg(ffmpeg_bin: &Path) -> Result<(), AppError> {
     Ok(())
   } else {
     Err(AppError::TaskExec("managed ffmpeg verification failed".to_string()))
+  }
+}
+
+fn validate_managed_ffmpeg_during_install(app: &AppHandle, ffmpeg_bin: &Path) -> Result<(), AppError> {
+  let (stdout, stderr) = resolve_environment_command_stdio(app);
+  let mut command = Command::new(ffmpeg_bin);
+  command.arg("-version").stdout(stdout).stderr(stderr);
+  let status = configure_background_command(&mut command)
+    .status()
+    .map_err(|error| environment_install_error(app, &format!("failed to verify ffmpeg: {}", error)))?;
+
+  if status.success() {
+    Ok(())
+  } else {
+    Err(environment_install_error(
+      app,
+      &format!("managed ffmpeg verification failed (exit code: {:?})", status.code()),
+    ))
   }
 }
 
@@ -779,16 +828,10 @@ fn resolve_runtime_requirements_file(app: &AppHandle) -> Result<PathBuf, AppErro
   }
 }
 
-fn resolve_environment_command_stdio(app: &AppHandle, file_name: &str) -> (Stdio, Stdio) {
-  let Ok(dir) = app.path().app_data_dir() else {
+fn resolve_environment_command_stdio(app: &AppHandle) -> (Stdio, Stdio) {
+  let Some(path) = resolve_environment_install_log_path(app) else {
     return (Stdio::null(), Stdio::null());
   };
-
-  if fs::create_dir_all(&dir).is_err() {
-    return (Stdio::null(), Stdio::null());
-  }
-
-  let path = dir.join(file_name);
   let Ok(file) = OpenOptions::new().create(true).append(true).open(path) else {
     return (Stdio::null(), Stdio::null());
   };
@@ -798,4 +841,47 @@ fn resolve_environment_command_stdio(app: &AppHandle, file_name: &str) -> (Stdio
   };
 
   (Stdio::from(file), Stdio::from(stderr_file))
+}
+
+fn resolve_environment_install_log_path(app: &AppHandle) -> Option<PathBuf> {
+  let dir = app.path().app_data_dir().ok()?;
+  if fs::create_dir_all(&dir).is_err() {
+    return None;
+  }
+  Some(dir.join(MANAGED_RUNTIME_INSTALL_LOG))
+}
+
+fn reset_environment_install_log(app: &AppHandle) {
+  let Some(path) = resolve_environment_install_log_path(app) else {
+    return;
+  };
+
+  let _ = fs::write(path, "");
+}
+
+fn environment_install_error(app: &AppHandle, summary: &str) -> AppError {
+  let mut message = summary.to_string();
+
+  if let Some(path) = resolve_environment_install_log_path(app) {
+    message.push_str(&format!("; log: {}", path.display()));
+    if let Ok(tail) = read_log_tail(&path, 12) {
+      if !tail.is_empty() {
+        message.push_str(&format!("; recent log: {}", tail.replace(['\r', '\n'], " | ")));
+      }
+    }
+  }
+
+  AppError::TaskExec(message)
+}
+
+fn read_log_tail(path: &Path, max_lines: usize) -> Result<String, AppError> {
+  let content = fs::read_to_string(path)?;
+  let lines = content
+    .lines()
+    .rev()
+    .filter(|line| !line.trim().is_empty())
+    .take(max_lines)
+    .collect::<Vec<_>>();
+
+  Ok(lines.into_iter().rev().collect::<Vec<_>>().join("\n"))
 }
