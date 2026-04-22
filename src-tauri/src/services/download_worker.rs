@@ -6,6 +6,7 @@ use std::process::{Command, Stdio};
 use tauri::{AppHandle, Manager};
 
 use crate::error::AppError;
+use crate::services::configure_background_command;
 use crate::services::python::{managed_runtime_bin_path, resolve_python_work_dir};
 use crate::services::runtime_log::append_runtime_log;
 
@@ -40,6 +41,7 @@ pub fn launch_batch_worker(app: &AppHandle, batch_id: &str) -> Result<(), AppErr
     command.current_dir(cwd);
   }
 
+  configure_background_command(&mut command);
   let child = command.spawn().map_err(|e| AppError::PythonStart(e.to_string()))?;
   append_runtime_log(app, &format!("batch worker spawned batch_id={} pid={}", batch_id, child.id()));
   Ok(())

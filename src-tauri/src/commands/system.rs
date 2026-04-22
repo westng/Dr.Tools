@@ -2,9 +2,10 @@ use std::process::Command;
 
 use tauri::State;
 
-use crate::error::AppError;
-use crate::domain::SystemInfo;
 use crate::application::AppState;
+use crate::domain::SystemInfo;
+use crate::error::AppError;
+use crate::services::configure_background_command;
 use crate::services::runtime_log::append_runtime_log;
 
 #[tauri::command]
@@ -54,12 +55,14 @@ pub fn open_external_url(url: String) -> Result<(), AppError> {
 
   #[cfg(target_os = "macos")]
   {
-    let open_status = Command::new("open").arg(normalized_url).status()?;
+    let mut open_command = Command::new("open");
+    open_command.arg(normalized_url);
+    let open_status = configure_background_command(&mut open_command).status()?;
     if !open_status.success() {
       let escaped_url = normalized_url.replace('\\', "\\\\").replace('"', "\\\"");
-      let fallback_status = Command::new("osascript")
-        .args(["-e", &format!("open location \"{}\"", escaped_url)])
-        .status()?;
+      let mut fallback_command = Command::new("osascript");
+      fallback_command.args(["-e", &format!("open location \"{}\"", escaped_url)]);
+      let fallback_status = configure_background_command(&mut fallback_command).status()?;
 
       if !fallback_status.success() {
         return Err(AppError::Io(format!(
@@ -73,7 +76,9 @@ pub fn open_external_url(url: String) -> Result<(), AppError> {
 
   #[cfg(target_os = "windows")]
   {
-    let status = Command::new("cmd").args(["/C", "start", "", normalized_url]).status()?;
+    let mut command = Command::new("cmd");
+    command.args(["/C", "start", "", normalized_url]);
+    let status = configure_background_command(&mut command).status()?;
     if !status.success() {
       return Err(AppError::Io(format!(
         "failed to open url with Windows shell status={:?}",
@@ -84,7 +89,9 @@ pub fn open_external_url(url: String) -> Result<(), AppError> {
 
   #[cfg(all(unix, not(target_os = "macos")))]
   {
-    let status = Command::new("xdg-open").arg(normalized_url).status()?;
+    let mut command = Command::new("xdg-open");
+    command.arg(normalized_url);
+    let status = configure_background_command(&mut command).status()?;
     if !status.success() {
       return Err(AppError::Io(format!(
         "failed to open url with xdg-open status={:?}",

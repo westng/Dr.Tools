@@ -15,6 +15,7 @@ use crate::application::AppState;
 use crate::domain::{RecordingAccountItem, RecordingLiveStatusResult};
 use crate::error::AppError;
 use crate::repositories::Db;
+use crate::services::configure_background_command;
 use crate::services::python::{managed_ffmpeg_bin_path, managed_runtime_bin_path, resolve_python_work_dir};
 use crate::services::runtime_log::append_runtime_log;
 
@@ -439,6 +440,7 @@ fn spawn_recording_worker(app: &AppHandle, task_id: &str) -> Result<Child, AppEr
     command.current_dir(cwd);
   }
 
+  configure_background_command(&mut command);
   command.spawn().map_err(|e| AppError::PythonStart(e.to_string()))
 }
 

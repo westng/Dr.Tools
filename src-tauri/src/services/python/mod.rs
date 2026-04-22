@@ -9,8 +9,9 @@ use serde_json::{json, Value};
 use tauri::{AppHandle, Manager};
 use uuid::Uuid;
 
-use crate::error::AppError;
 use crate::domain::{PythonRequest, PythonResponse};
+use crate::error::AppError;
+use crate::services::configure_background_command;
 use crate::services::runtime_log::append_runtime_log;
 
 pub const MANAGED_PYTHON_VERSION: &str = "3.12.12";
@@ -120,6 +121,7 @@ impl PythonManager {
       command.current_dir(cwd);
     }
 
+    configure_background_command(&mut command);
     let mut child = command
       .spawn()
       .map_err(|e| AppError::PythonStart(e.to_string()))?;
@@ -232,6 +234,7 @@ fn ensure_started(state: &mut PythonState, app: &AppHandle) -> Result<(), AppErr
     command.current_dir(cwd);
   }
 
+  configure_background_command(&mut command);
   let mut child = command
     .spawn()
     .map_err(|e| AppError::PythonStart(e.to_string()))?;

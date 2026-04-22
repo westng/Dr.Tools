@@ -1,10 +1,10 @@
 use chrono::Utc;
 use flate2::read::GzDecoder;
 use reqwest::blocking::Client;
-use std::fs::{self, File};
+use std::fs::{self, File, OpenOptions};
 use std::io::{BufWriter, Write};
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Stdio};
 use tar::Archive;
 use tauri::{AppHandle, Manager, State};
 
@@ -14,6 +14,7 @@ use crate::domain::{
   UpdateCheckResult,
 };
 use crate::error::AppError;
+use crate::services::configure_background_command;
 use crate::services::python::{
   managed_ffmpeg_bin_path, managed_ffmpeg_root, managed_ffmpeg_version, managed_runtime_bin_path,
   managed_runtime_root, MANAGED_FFMPEG_ARM64_MACOS_VERSION, MANAGED_FFMPEG_SOURCE_BASE_URL,
@@ -642,12 +643,18 @@ fn resolve_ffmpeg_bin_in_root(root: &Path) -> Result<PathBuf, AppError> {
 
 fn ensure_runtime_requirements(app: &AppHandle, runtime_root: &Path, python_bin: &Path) -> Result<(), AppError> {
   let requirements_path = resolve_runtime_requirements_file(app)?;
+  let (ensurepip_stdout, ensurepip_stderr) =
+    resolve_environment_command_stdio(app, "managed-runtime-install.log");
 
-  let ensurepip_status = Command::new(python_bin)
+  let mut ensurepip_command = Command::new(python_bin);
+  ensurepip_command
     .arg("-m")
     .arg("ensurepip")
     .arg("--upgrade")
-    .current_dir(runtime_root)
+    .stdout(ensurepip_stdout)
+    .stderr(ensurepip_stderr)
+    .current_dir(runtime_root);
+  let ensurepip_status = configure_background_command(&mut ensurepip_command)
     .status()
     .map_err(|error| AppError::TaskExec(format!("failed to bootstrap pip: {}", error)))?;
 
@@ -657,17 +664,23 @@ fn ensure_runtime_requirements(app: &AppHandle, runtime_root: &Path, python_bin:
     ));
   }
 
-  let install_status = Command::new(python_bin)
+  let (install_stdout, install_stderr) = resolve_environment_command_stdio(app, "managed-runtime-install.log");
+  let mut install_command = Command::new(python_bin);
+  install_command
     .arg("-m")
     .arg("pip")
     .arg("install")
     .arg("--disable-pip-version-check")
     .arg("--no-input")
+    .arg("--no-warn-script-location")
     .arg("-r")
     .arg(&requirements_path)
     .arg("-i")
     .arg(PYPI_MIRROR_URL)
-    .current_dir(runtime_root)
+    .stdout(install_stdout)
+    .stderr(install_stderr)
+    .current_dir(runtime_root);
+  let install_status = configure_background_command(&mut install_command)
     .status()
     .map_err(|error| AppError::TaskExec(format!("failed to install runtime dependencies: {}", error)))?;
 
@@ -710,9 +723,13 @@ fn install_managed_ffmpeg(app: &AppHandle) -> Result<(), AppError> {
 }
 
 fn validate_managed_runtime(python_bin: &Path) -> Result<(), AppError> {
-  let status = Command::new(python_bin)
+  let mut command = Command::new(python_bin);
+  command
     .arg("-c")
     .arg("import f2, httpx, sys; print(sys.version)")
+    .stdout(Stdio::null())
+    .stderr(Stdio::null());
+  let status = configure_background_command(&mut command)
     .status()
     .map_err(|error| AppError::TaskExec(format!("failed to verify managed environment: {}", error)))?;
 
@@ -726,8 +743,9 @@ fn validate_managed_runtime(python_bin: &Path) -> Result<(), AppError> {
 }
 
 fn validate_managed_ffmpeg(ffmpeg_bin: &Path) -> Result<(), AppError> {
-  let status = Command::new(ffmpeg_bin)
-    .arg("-version")
+  let mut command = Command::new(ffmpeg_bin);
+  command.arg("-version").stdout(Stdio::null()).stderr(Stdio::null());
+  let status = configure_background_command(&mut command)
     .status()
     .map_err(|error| AppError::TaskExec(format!("failed to verify ffmpeg: {}", error)))?;
 
@@ -759,4 +777,25 @@ fn resolve_runtime_requirements_file(app: &AppHandle) -> Result<PathBuf, AppErro
       "runtime requirements file not found in bundled resources".to_string(),
     ))
   }
+}
+
+fn resolve_environment_command_stdio(app: &AppHandle, file_name: &str) -> (Stdio, Stdio) {
+  let Ok(dir) = app.path().app_data_dir() else {
+    return (Stdio::null(), Stdio::null());
+  };
+
+  if fs::create_dir_all(&dir).is_err() {
+    return (Stdio::null(), Stdio::null());
+  }
+
+  let path = dir.join(file_name);
+  let Ok(file) = OpenOptions::new().create(true).append(true).open(path) else {
+    return (Stdio::null(), Stdio::null());
+  };
+
+  let Ok(stderr_file) = file.try_clone() else {
+    return (Stdio::from(file), Stdio::null());
+  };
+
+  (Stdio::from(file), Stdio::from(stderr_file))
 }

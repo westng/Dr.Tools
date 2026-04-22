@@ -7,8 +7,9 @@ use std::thread;
 use serde_json::json;
 use tauri::{AppHandle, Manager};
 
-use crate::error::AppError;
 use crate::application::AppState;
+use crate::error::AppError;
+use crate::services::configure_background_command;
 use crate::services::runtime_log::append_runtime_log;
 
 const DEFAULT_MAX_CONCURRENT_DOWNLOADS: usize = 3;
@@ -325,7 +326,9 @@ fn send_system_notification(title: &str, body: &str) {
       apple_script_string(body),
       apple_script_string(title),
     );
-    let _ = Command::new("osascript").arg("-e").arg(script).spawn();
+    let mut command = Command::new("osascript");
+    command.arg("-e").arg(script);
+    let _ = configure_background_command(&mut command).spawn();
   }
 
   #[cfg(target_os = "windows")]
@@ -353,14 +356,16 @@ $notifier.Show($toast)
       xml_escape(title),
       xml_escape(body),
     );
-    let _ = Command::new("powershell")
-      .args(["-NoProfile", "-NonInteractive", "-Command", &script])
-      .status();
+    let mut command = Command::new("powershell");
+    command.args(["-NoProfile", "-NonInteractive", "-Command", &script]);
+    let _ = configure_background_command(&mut command).status();
   }
 
   #[cfg(target_os = "linux")]
   {
-    let _ = Command::new("notify-send").args([title, body]).spawn();
+    let mut command = Command::new("notify-send");
+    command.args([title, body]);
+    let _ = configure_background_command(&mut command).spawn();
   }
 }
 
