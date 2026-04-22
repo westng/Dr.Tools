@@ -12,7 +12,8 @@ use std::path::PathBuf;
 
 use commands::{
   clear_recording_runs, download_batch_detail, download_batch_list, download_batch_retry, frontend_log_error,
-  open_download_batch_detail_window, open_external_url, open_recording_account_create_window,
+  environment_download, environment_status, open_download_batch_detail_window, open_external_url,
+  open_recording_account_create_window,
   open_recording_account_edit_window, open_recording_account_logs_window, open_task_detail_window, python_ping,
   recording_account_create, recording_account_delete, recording_account_detail, recording_account_logs,
   recording_account_set_enabled, recording_account_update, recording_accounts_check, recording_accounts_snapshot,
@@ -75,7 +76,9 @@ fn main() {
       settings_update,
       settings_check_update,
       select_export_directory,
-      token_validate
+      token_validate,
+      environment_status,
+      environment_download
     ])
     .run(tauri::generate_context!())
     .expect("failed to run tauri application");

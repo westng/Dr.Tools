@@ -11,7 +11,8 @@ pub use recording::{
   recording_accounts_snapshot, resolve_recording_account_profile,
 };
 pub use settings::{
-  select_export_directory, settings_check_update, settings_get, settings_update, token_validate,
+  environment_download, environment_status, select_export_directory, settings_check_update, settings_get,
+  settings_update, token_validate,
 };
 pub use system::{frontend_log_error, open_external_url, python_ping, system_info};
 pub use tasks::{

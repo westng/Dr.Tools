@@ -13,6 +13,12 @@ use crate::error::AppError;
 use crate::domain::{PythonRequest, PythonResponse};
 use crate::services::runtime_log::append_runtime_log;
 
+pub const MANAGED_PYTHON_VERSION: &str = "3.12.12";
+pub const MANAGED_PYTHON_RELEASE: &str = "20260203";
+pub const MANAGED_PYTHON_SOURCE_LABEL: &str = "NJU Mirror · python-build-standalone";
+pub const MANAGED_PYTHON_SOURCE_BASE_URL: &str =
+  "https://mirror.nju.edu.cn/github-release/astral-sh/python-build-standalone";
+
 struct PythonProcess {
   child: Child,
   stdin: ChildStdin,
@@ -252,6 +258,15 @@ fn resolve_python_launch(app: &AppHandle) -> Result<(String, Vec<String>, Option
     return Ok((bin, vec![script], None));
   }
 
+  if let Some(runtime_bin) = managed_runtime_bin_path(app) {
+    let script = resolve_python_script_path(app)?;
+    return Ok((
+      runtime_bin.to_string_lossy().to_string(),
+      vec![script.to_string_lossy().to_string()],
+      None,
+    ));
+  }
+
   if cfg!(debug_assertions) {
     if let Some((venv_python, script)) = detect_manifest_python_launch() {
       return Ok((venv_python, vec![script], None));
@@ -288,6 +303,53 @@ fn resolve_python_launch(app: &AppHandle) -> Result<(String, Vec<String>, Option
   Err(AppError::PythonStart(
     "embedded python runtime not found; set DRTOOLS_PYTHON_BIN for development".to_string(),
   ))
+}
+
+pub fn managed_runtime_root(app: &AppHandle) -> Option<PathBuf> {
+  let base = app.path().app_data_dir().ok()?;
+  Some(
+    base
+      .join("python-runtime-managed")
+      .join(format!("python-{}", MANAGED_PYTHON_VERSION)),
+  )
+}
+
+pub fn managed_runtime_bin_path(app: &AppHandle) -> Option<PathBuf> {
+  let root = managed_runtime_root(app)?;
+  let bin = if cfg!(target_os = "windows") {
+    root.join("python").join("python.exe")
+  } else {
+    root.join("python").join("bin").join("python")
+  };
+
+  if bin.exists() {
+    Some(bin)
+  } else {
+    None
+  }
+}
+
+pub fn resolve_python_script_path(app: &AppHandle) -> Result<PathBuf, AppError> {
+  if cfg!(debug_assertions) {
+    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let dev_script = manifest_dir.join("python").join("main.py");
+    if dev_script.exists() {
+      return Ok(dev_script);
+    }
+  }
+
+  let resource_dir = app
+    .path()
+    .resource_dir()
+    .map_err(|e| AppError::PythonStart(e.to_string()))?;
+  let bundled_script = resource_dir.join("python").join("main.py");
+  if bundled_script.exists() {
+    Ok(bundled_script)
+  } else {
+    Err(AppError::PythonStart(
+      "python main script not found in bundled resources".to_string(),
+    ))
+  }
 }
 
 fn detect_workspace_venv_python() -> Option<String> {

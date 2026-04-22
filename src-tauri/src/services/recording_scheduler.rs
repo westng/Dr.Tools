@@ -15,6 +15,7 @@ use crate::application::AppState;
 use crate::domain::{RecordingAccountItem, RecordingLiveStatusResult};
 use crate::error::AppError;
 use crate::repositories::Db;
+use crate::services::python::managed_runtime_bin_path;
 use crate::services::runtime_log::append_runtime_log;
 
 const DEFAULT_MAX_CONCURRENT_RECORDINGS: usize = 3;
@@ -444,6 +445,15 @@ fn resolve_recording_worker_launch(app: &AppHandle) -> Result<(String, String, O
     return Ok((bin, script, None));
   }
 
+  if let Some(runtime_bin) = managed_runtime_bin_path(app) {
+    let script = resolve_managed_recording_worker_script(app)?;
+    return Ok((
+      runtime_bin.to_string_lossy().to_string(),
+      script.to_string_lossy().to_string(),
+      None,
+    ));
+  }
+
   if cfg!(debug_assertions) {
     if let Some((bin, script)) = detect_manifest_recording_worker_launch() {
       return Ok((bin, script, None));
@@ -486,6 +496,29 @@ fn detect_manifest_recording_worker_launch() -> Option<(String, String)> {
     ));
   }
   None
+}
+
+fn resolve_managed_recording_worker_script(app: &AppHandle) -> Result<PathBuf, AppError> {
+  if cfg!(debug_assertions) {
+    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let dev_script = manifest_dir.join("python").join("recording_worker.py");
+    if dev_script.exists() {
+      return Ok(dev_script);
+    }
+  }
+
+  let resource_dir = app
+    .path()
+    .resource_dir()
+    .map_err(|e| AppError::PythonStart(e.to_string()))?;
+  let script = resource_dir.join("python").join("recording_worker.py");
+  if script.exists() {
+    Ok(script)
+  } else {
+    Err(AppError::PythonStart(
+      "recording worker script not found in bundled resources".to_string(),
+    ))
+  }
 }
 
 fn resolve_worker_stderr(app: &AppHandle) -> Stdio {

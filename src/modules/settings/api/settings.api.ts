@@ -2,6 +2,7 @@ import { invoke } from '@tauri-apps/api/core';
 import type {
   AppSettings,
   AppSettingsPatch,
+  ManagedEnvironmentStatus,
   TokenValidationPayload,
   TokenValidationResult,
   UpdateCheckResult,
@@ -25,4 +26,12 @@ export async function selectExportDirectory(current?: string): Promise<string | 
 
 export async function validateToken(payload: TokenValidationPayload): Promise<TokenValidationResult> {
   return invoke<TokenValidationResult>('token_validate', { payload });
+}
+
+export async function getEnvironmentStatus(): Promise<ManagedEnvironmentStatus> {
+  return invoke<ManagedEnvironmentStatus>('environment_status');
+}
+
+export async function downloadEnvironment(): Promise<ManagedEnvironmentStatus> {
+  return invoke<ManagedEnvironmentStatus>('environment_download');
 }

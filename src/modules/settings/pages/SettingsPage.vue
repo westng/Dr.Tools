@@ -2,12 +2,24 @@
 import { computed, onMounted, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 import { openExternalUrl } from '@/api/system.api';
-import { selectExportDirectory, validateToken } from '@/modules/settings/api/settings.api';
+import {
+  downloadEnvironment,
+  getEnvironmentStatus,
+  selectExportDirectory,
+  validateToken
+} from '@/modules/settings/api/settings.api';
 import { useSettingsStore } from '@/modules/settings/stores/settings.store';
 import { useAppStore } from '@/stores/app.store';
 import { useMessages } from '@/i18n';
+import { toErrorMessage } from '@/lib/errors';
 import { resolveTheme } from '@/theme/appearance';
-import type { LocaleCode, ThemeMode, TokenCheckStatus, TokenPlatform } from '@/modules/settings/types';
+import type {
+  LocaleCode,
+  ManagedEnvironmentStatus,
+  ThemeMode,
+  TokenCheckStatus,
+  TokenPlatform
+} from '@/modules/settings/types';
 
 const settingsStore = useSettingsStore();
 const appStore = useAppStore();
@@ -23,6 +35,10 @@ const tiktokCookieInput = ref('');
 const expandedGuide = ref<TokenPlatform | null>(null);
 const validatingPlatform = ref<TokenPlatform | null>(null);
 const tokenActionError = ref('');
+const environmentStatus = ref<ManagedEnvironmentStatus | null>(null);
+const loadingEnvironment = ref(false);
+const downloadingEnvironment = ref(false);
+const environmentActionError = ref('');
 const text = useMessages((messages) => messages.pages.settings);
 const colorLabels = computed<Record<string, string>>(() => ({ ...text.value.colorLabels }));
 const resolvedTheme = computed<'light' | 'dark'>(() => resolveTheme(settings.value.themeMode));
@@ -44,6 +60,28 @@ onMounted(async () => {
   await settingsStore.ensureLoaded();
   if (!systemInfo.value) {
     await appStore.bootstrap();
+  }
+  await refreshEnvironmentStatus();
+});
+
+const environmentButtonLabel = computed(() => {
+  if (downloadingEnvironment.value) {
+    return text.value.environmentDownloading;
+  }
+  if (environmentStatus.value?.installed) {
+    return text.value.environmentRedownload;
+  }
+  return text.value.environmentDownload;
+});
+
+const environmentStatusLabel = computed(() => {
+  switch (environmentStatus.value?.status) {
+    case 'ready':
+      return text.value.environmentReady;
+    case 'invalid':
+      return text.value.environmentInvalid;
+    default:
+      return text.value.environmentMissing;
   }
 });
 
@@ -244,6 +282,31 @@ async function setAutoCheck(enabled: boolean): Promise<void> {
 async function checkUpdatesNow(): Promise<void> {
   await settingsStore.checkForUpdates();
 }
+
+async function refreshEnvironmentStatus(): Promise<void> {
+  loadingEnvironment.value = true;
+  environmentActionError.value = '';
+  try {
+    environmentStatus.value = await getEnvironmentStatus();
+  } catch (error) {
+    environmentActionError.value = toErrorMessage(error);
+  } finally {
+    loadingEnvironment.value = false;
+  }
+}
+
+async function downloadManagedEnvironment(): Promise<void> {
+  downloadingEnvironment.value = true;
+  environmentActionError.value = '';
+  try {
+    environmentStatus.value = await downloadEnvironment();
+  } catch (error) {
+    environmentActionError.value = toErrorMessage(error);
+    await refreshEnvironmentStatus();
+  } finally {
+    downloadingEnvironment.value = false;
+  }
+}
 </script>
 
 <template>
@@ -363,6 +426,49 @@ async function checkUpdatesNow(): Promise<void> {
           </div>
         </div>
       </article>
+    </div>
+
+    <div class="settings-group">
+      <h3 class="settings-group-title">{{ text.environmentSection }}</h3>
+      <article class="surface settings-block">
+        <div class="setting-row setting-row-with-description">
+          <span class="settings-label">{{ text.environmentItem }}</span>
+          <div class="setting-control">
+            <button class="primary-btn" :disabled="downloadingEnvironment" @click="downloadManagedEnvironment">
+              {{ environmentButtonLabel }}
+            </button>
+          </div>
+        </div>
+
+        <div class="setting-row setting-row-description">
+          <p class="settings-hint">{{ environmentStatus?.message || text.environmentDescription }}</p>
+        </div>
+
+        <div class="setting-row">
+          <span class="settings-label">{{ text.environmentStatus }}</span>
+          <div class="setting-control">
+            <span class="settings-hint">{{ loadingEnvironment ? text.environmentLoading : environmentStatusLabel }}</span>
+          </div>
+        </div>
+
+        <div class="setting-row">
+          <span class="settings-label">{{ text.environmentVersion }}</span>
+          <div class="setting-control">
+            <span class="settings-hint">{{ environmentStatus?.pythonVersion || '3.12' }}</span>
+          </div>
+        </div>
+
+        <div class="setting-row">
+          <span class="settings-label">{{ text.environmentSource }}</span>
+          <div class="setting-control">
+            <a class="settings-link" :href="environmentStatus?.sourceUrl || '#'" target="_blank" rel="noreferrer">
+              {{ environmentStatus?.sourceLabel || text.environmentSourceDefault }}
+            </a>
+          </div>
+        </div>
+      </article>
+
+      <p v-if="environmentActionError" class="danger-text">{{ environmentActionError }}</p>
     </div>
 
     <div class="settings-group">
@@ -927,6 +1033,15 @@ async function checkUpdatesNow(): Promise<void> {
   margin: 0;
   font-size: 12px;
   color: var(--text-muted);
+}
+
+.settings-link {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.settings-link:hover {
+  text-decoration: underline;
 }
 
 .settings-footer {

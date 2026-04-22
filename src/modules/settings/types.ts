@@ -59,3 +59,16 @@ export interface TokenValidationResult {
   status: TokenCheckStatus;
   message: string;
 }
+
+export type ManagedEnvironmentState = 'missing' | 'ready' | 'invalid';
+
+export interface ManagedEnvironmentStatus {
+  pythonVersion: string;
+  sourceLabel: string;
+  sourceUrl: string;
+  installDir: string;
+  pythonBin?: string | null;
+  installed: boolean;
+  status: ManagedEnvironmentState;
+  message: string;
+}

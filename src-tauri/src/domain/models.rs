@@ -352,3 +352,16 @@ pub struct UpdateCheckResult {
   pub current_version: String,
   pub latest_version: String,
 }
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ManagedEnvironmentStatus {
+  pub python_version: String,
+  pub source_label: String,
+  pub source_url: String,
+  pub install_dir: String,
+  pub python_bin: Option<String>,
+  pub installed: bool,
+  pub status: String,
+  pub message: String,
+}
