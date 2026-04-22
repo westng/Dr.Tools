@@ -21,11 +21,16 @@ use commands::{
   system_info, task_batch_details, task_detail, task_list, task_run, token_validate, video_download_submit,
 };
 use tauri::Manager;
+#[cfg(target_os = "macos")]
+use tauri::menu::{
+  AboutMetadata, HELP_SUBMENU_ID, Menu, PredefinedMenuItem, Submenu, WINDOW_SUBMENU_ID,
+};
 use crate::services::runtime_log::append_runtime_log;
 
 fn main() {
   tauri::Builder::default()
     .setup(|app| {
+      install_macos_menu(app)?;
       install_panic_hook(resolve_panic_log_path(app.handle()));
       let app_state = application::AppState::bootstrap(app.handle())?;
       app.manage(app_state);
@@ -82,6 +87,90 @@ fn main() {
     ])
     .run(tauri::generate_context!())
     .expect("failed to run tauri application");
+}
+
+#[cfg(target_os = "macos")]
+fn install_macos_menu(app: &mut tauri::App) -> tauri::Result<()> {
+  let handle = app.handle();
+  let pkg_info = handle.package_info();
+  let config = handle.config();
+  let about_text = format!("关于 {}", pkg_info.name);
+  let hide_text = format!("隐藏 {}", pkg_info.name);
+  let quit_text = format!("退出 {}", pkg_info.name);
+  let about_metadata = AboutMetadata {
+    name: Some(pkg_info.name.clone()),
+    version: Some(pkg_info.version.to_string()),
+    copyright: config.bundle.copyright.clone(),
+    authors: config.bundle.publisher.clone().map(|publisher| vec![publisher]),
+    ..Default::default()
+  };
+
+  let app_menu = Submenu::with_items(
+    handle,
+    pkg_info.name.clone(),
+    true,
+    &[
+      &PredefinedMenuItem::about(handle, Some(&about_text), Some(about_metadata))?,
+      &PredefinedMenuItem::separator(handle)?,
+      &PredefinedMenuItem::services(handle, Some("服务"))?,
+      &PredefinedMenuItem::separator(handle)?,
+      &PredefinedMenuItem::hide(handle, Some(&hide_text))?,
+      &PredefinedMenuItem::hide_others(handle, Some("隐藏其他"))?,
+      &PredefinedMenuItem::separator(handle)?,
+      &PredefinedMenuItem::quit(handle, Some(&quit_text))?,
+    ],
+  )?;
+  let file_menu = Submenu::with_items(
+    handle,
+    "文件",
+    true,
+    &[&PredefinedMenuItem::close_window(handle, Some("关闭窗口"))?],
+  )?;
+  let edit_menu = Submenu::with_items(
+    handle,
+    "编辑",
+    true,
+    &[
+      &PredefinedMenuItem::undo(handle, Some("撤销"))?,
+      &PredefinedMenuItem::redo(handle, Some("重做"))?,
+      &PredefinedMenuItem::separator(handle)?,
+      &PredefinedMenuItem::cut(handle, Some("剪切"))?,
+      &PredefinedMenuItem::copy(handle, Some("复制"))?,
+      &PredefinedMenuItem::paste(handle, Some("粘贴"))?,
+      &PredefinedMenuItem::select_all(handle, Some("全选"))?,
+    ],
+  )?;
+  let view_menu = Submenu::with_items(
+    handle,
+    "显示",
+    true,
+    &[&PredefinedMenuItem::fullscreen(handle, Some("切换全屏"))?],
+  )?;
+  let window_menu = Submenu::with_id_and_items(
+    handle,
+    WINDOW_SUBMENU_ID,
+    "窗口",
+    true,
+    &[
+      &PredefinedMenuItem::minimize(handle, Some("最小化"))?,
+      &PredefinedMenuItem::maximize(handle, Some("缩放"))?,
+      &PredefinedMenuItem::separator(handle)?,
+      &PredefinedMenuItem::close_window(handle, Some("关闭窗口"))?,
+    ],
+  )?;
+  let help_menu = Submenu::with_id_and_items(handle, HELP_SUBMENU_ID, "帮助", true, &[])?;
+  let menu = Menu::with_items(
+    handle,
+    &[&app_menu, &file_menu, &edit_menu, &view_menu, &window_menu, &help_menu],
+  )?;
+
+  app.set_menu(menu)?;
+  Ok(())
+}
+
+#[cfg(not(target_os = "macos"))]
+fn install_macos_menu(_app: &mut tauri::App) -> tauri::Result<()> {
+  Ok(())
 }
 
 fn resolve_panic_log_path(app: &tauri::AppHandle) -> PathBuf {
