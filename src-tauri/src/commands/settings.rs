@@ -638,7 +638,7 @@ fn ensure_runtime_requirements(app: &AppHandle, runtime_root: &Path, python_bin:
 fn validate_managed_runtime(python_bin: &Path) -> Result<(), AppError> {
   let status = Command::new(python_bin)
     .arg("-c")
-    .arg("import httpx, sys; print(sys.version)")
+    .arg("import f2, httpx, sys; print(sys.version)")
     .status()
     .map_err(|error| AppError::TaskExec(format!("failed to verify managed environment: {}", error)))?;
 
