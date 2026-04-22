@@ -193,7 +193,8 @@ pub fn environment_status(app: AppHandle) -> Result<ManagedEnvironmentStatus, Ap
 }
 
 #[tauri::command]
-pub async fn environment_download(app: AppHandle) -> Result<ManagedEnvironmentStatus, AppError> {
+pub async fn environment_download(app: AppHandle, state: State<'_, AppState>) -> Result<ManagedEnvironmentStatus, AppError> {
+  state.python.stop()?;
   tauri::async_runtime::spawn_blocking(move || install_managed_environment(&app))
     .await
     .map_err(|error| AppError::TaskExec(format!("environment install task failed: {}", error)))?
@@ -506,6 +507,35 @@ fn read_environment_status(app: &AppHandle) -> Result<ManagedEnvironmentStatus, 
 }
 
 fn install_managed_environment(app: &AppHandle) -> Result<ManagedEnvironmentStatus, AppError> {
+  reset_environment_install_log(app);
+  append_environment_install_log(app, "managed environment install start");
+
+  let python_ready = managed_runtime_bin_path(app)
+    .as_ref()
+    .map(|bin| validate_managed_runtime(bin).is_ok())
+    .unwrap_or(false);
+  if python_ready {
+    append_environment_install_log(app, "managed python runtime already ready, skip reinstall");
+  } else {
+    install_managed_python(app)?;
+  }
+
+  let ffmpeg_ready = managed_ffmpeg_bin_path(app)
+    .as_ref()
+    .map(|bin| validate_managed_ffmpeg(bin).is_ok())
+    .unwrap_or(false);
+  if ffmpeg_ready {
+    append_environment_install_log(app, "managed ffmpeg already ready, skip reinstall");
+  } else {
+    install_managed_ffmpeg(app)?;
+  }
+
+  append_environment_install_log(app, "managed environment install completed");
+  read_environment_status(app)
+}
+
+fn install_managed_python(app: &AppHandle) -> Result<(), AppError> {
+  append_environment_install_log(app, "managed python install start");
   let install_dir = managed_runtime_root(app)
     .ok_or_else(|| AppError::Io("failed to resolve app data directory".to_string()))?;
   let base_dir = install_dir
@@ -518,24 +548,33 @@ fn install_managed_environment(app: &AppHandle) -> Result<ManagedEnvironmentStat
   let temp_dir = base_dir.join(format!("python-{}.tmp", MANAGED_PYTHON_VERSION));
 
   if temp_dir.exists() {
-    fs::remove_dir_all(&temp_dir)?;
+    fs::remove_dir_all(&temp_dir)
+      .map_err(|error| environment_install_error(app, &format!("failed to remove temporary python runtime: {}", error)))?;
   }
 
-  reset_environment_install_log(app);
-  download_archive(&archive_url, &archive_path)?;
-  extract_archive(&archive_path, &temp_dir)?;
+  append_environment_install_log(app, &format!("download python runtime from {}", archive_url));
+  download_archive(&archive_url, &archive_path)
+    .map_err(|error| environment_install_error(app, &format!("failed to download python runtime: {}", error)))?;
+  append_environment_install_log(app, "extract python runtime");
+  extract_archive(&archive_path, &temp_dir)
+    .map_err(|error| environment_install_error(app, &format!("failed to extract python runtime: {}", error)))?;
   let python_bin = resolve_python_bin_in_root(&temp_dir)?;
   ensure_runtime_requirements(app, &temp_dir, &python_bin)?;
 
   if install_dir.exists() {
-    fs::remove_dir_all(&install_dir)?;
+    append_environment_install_log(app, "replace existing python runtime");
+    fs::remove_dir_all(&install_dir).map_err(|error| {
+      environment_install_error(
+        app,
+        &format!("failed to replace existing python runtime, close running tasks and retry: {}", error),
+      )
+    })?;
   }
-  fs::rename(&temp_dir, &install_dir)?;
+  fs::rename(&temp_dir, &install_dir)
+    .map_err(|error| environment_install_error(app, &format!("failed to activate python runtime: {}", error)))?;
   let _ = fs::remove_file(&archive_path);
-
-  install_managed_ffmpeg(app)?;
-
-  read_environment_status(app)
+  append_environment_install_log(app, "managed python install completed");
+  Ok(())
 }
 
 fn resolve_ffmpeg_archive_url() -> Result<String, AppError> {
@@ -703,6 +742,7 @@ fn ensure_runtime_requirements(app: &AppHandle, runtime_root: &Path, python_bin:
 }
 
 fn install_managed_ffmpeg(app: &AppHandle) -> Result<(), AppError> {
+  append_environment_install_log(app, "managed ffmpeg install start");
   let install_dir = managed_ffmpeg_root(app)
     .ok_or_else(|| AppError::Io("failed to resolve ffmpeg app data directory".to_string()))?;
   let base_dir = install_dir
@@ -715,19 +755,28 @@ fn install_managed_ffmpeg(app: &AppHandle) -> Result<(), AppError> {
   let temp_dir = base_dir.join(format!("ffmpeg-{}.tmp", managed_ffmpeg_version()));
 
   if temp_dir.exists() {
-    fs::remove_dir_all(&temp_dir)?;
+    fs::remove_dir_all(&temp_dir)
+      .map_err(|error| environment_install_error(app, &format!("failed to remove temporary ffmpeg runtime: {}", error)))?;
   }
 
-  download_archive(&archive_url, &archive_path)?;
-  extract_archive(&archive_path, &temp_dir)?;
+  append_environment_install_log(app, &format!("download ffmpeg runtime from {}", archive_url));
+  download_archive(&archive_url, &archive_path)
+    .map_err(|error| environment_install_error(app, &format!("failed to download ffmpeg runtime: {}", error)))?;
+  append_environment_install_log(app, "extract ffmpeg runtime");
+  extract_archive(&archive_path, &temp_dir)
+    .map_err(|error| environment_install_error(app, &format!("failed to extract ffmpeg runtime: {}", error)))?;
   let ffmpeg_bin = resolve_ffmpeg_bin_in_root(&temp_dir)?;
   validate_managed_ffmpeg_during_install(app, &ffmpeg_bin)?;
 
   if install_dir.exists() {
-    fs::remove_dir_all(&install_dir)?;
+    append_environment_install_log(app, "replace existing ffmpeg runtime");
+    fs::remove_dir_all(&install_dir)
+      .map_err(|error| environment_install_error(app, &format!("failed to replace existing ffmpeg runtime: {}", error)))?;
   }
-  fs::rename(&temp_dir, &install_dir)?;
+  fs::rename(&temp_dir, &install_dir)
+    .map_err(|error| environment_install_error(app, &format!("failed to activate ffmpeg runtime: {}", error)))?;
   let _ = fs::remove_file(&archive_path);
+  append_environment_install_log(app, "managed ffmpeg install completed");
   Ok(())
 }
 
@@ -859,7 +908,18 @@ fn reset_environment_install_log(app: &AppHandle) {
   let _ = fs::write(path, "");
 }
 
+fn append_environment_install_log(app: &AppHandle, message: &str) {
+  let Some(path) = resolve_environment_install_log_path(app) else {
+    return;
+  };
+
+  if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(path) {
+    let _ = writeln!(file, "{} {}", Utc::now().to_rfc3339(), message);
+  }
+}
+
 fn environment_install_error(app: &AppHandle, summary: &str) -> AppError {
+  append_environment_install_log(app, &format!("ERROR {}", summary));
   let mut message = summary.to_string();
 
   if let Some(path) = resolve_environment_install_log_path(app) {
